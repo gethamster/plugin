@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "The spec layer for Codex",
-    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. The hosted Hamster MCP server at https://tryhamster.com/mcp can search and read briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context; Ask Hamster falls back to hamster chat when those tools are absent.",
+    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. Ask Hamster reads briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context over the Hamster CLI, and over the hosted Hamster MCP server at https://tryhamster.com/mcp in clients that have those tools.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
