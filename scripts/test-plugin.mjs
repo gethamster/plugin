@@ -2,7 +2,8 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,11 +74,43 @@ async function runValidator(cwd) {
   return run(process.execPath, [validatorPath], { cwd });
 }
 
-async function patchCodexInterface(cwd, patch) {
+async function patchCodexManifest(cwd, patch) {
   const manifestPath = path.join(cwd, ".codex-plugin", "plugin.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  patch(manifest.interface);
+  patch(manifest);
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+async function patchCodexInterface(cwd, patch) {
+  await patchCodexManifest(cwd, (manifest) => patch(manifest.interface));
+}
+
+// The bundle builder refuses sources that match no commit, so fixtures that
+// build a bundle need a checkout rather than a bare directory.
+async function commitPackage(cwd) {
+  const git = (...args) => run("git", args, { cwd });
+  assert.equal((await git("init", "--quiet")).code, 0);
+  assert.equal((await git("add", "--all")).code, 0);
+  const commit = await git(
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.com",
+    "commit",
+    "--quiet",
+    "--message",
+    "fixture"
+  );
+  assert.equal(commit.code, 0, commit.stderr);
+}
+
+async function pathExists(target) {
+  try {
+    await stat(target);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function buildCodexBundle(cwd, args = []) {
@@ -262,18 +295,29 @@ test("a drifted duplicate fails validation", async () => {
   assert.match(result.stderr, /Duplicated copies have diverged and must stay byte-identical/);
 });
 
-test("the Codex bundle carries only skills, assets, and an MCP-free manifest", async () => {
+test("the Codex bundle carries only skills, assets, and a stripped manifest", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-");
   await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.apps = "./.app.json";
+    manifest.interface.screenshots = ["./assets/logo.png"];
+  });
+  await commitPackage(cwd);
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.equal(result.code, 0, result.stderr);
 
   const entries = await zipEntries(zipPath);
-  for (const expected of [".codex-plugin/plugin.json", "skills/ship/SKILL.md", "assets/logo.png", "LICENSE"]) {
+  const skillDirs = (await readdir(path.join(cwd, "skills"), { withFileTypes: true })).filter((entry) =>
+    entry.isDirectory()
+  );
+  for (const skill of skillDirs) {
+    assert.ok(entries.includes(`skills/${skill.name}/SKILL.md`), `expected skills/${skill.name}/SKILL.md`);
+  }
+  for (const expected of [".codex-plugin/plugin.json", "assets/logo.png", "LICENSE"]) {
     assert.ok(entries.includes(expected), `expected ${expected} in ${entries.join(", ")}`);
   }
-  for (const forbidden of ["plugin.json", "mcp.json", ".mcp.json", "agents/task-executor.md"]) {
+  for (const forbidden of ["plugin.json", "mcp.json", ".mcp.json", "mcp_config.json", "agents/task-executor.md"]) {
     assert.ok(!entries.includes(forbidden), `did not expect ${forbidden} in the bundle`);
   }
 
@@ -281,21 +325,39 @@ test("the Codex bundle carries only skills, assets, and an MCP-free manifest", a
   assert.equal(manifestDump.code, 0, manifestDump.stderr);
   const manifest = JSON.parse(manifestDump.stdout);
   assert.equal(Object.hasOwn(manifest, "mcpServers"), false);
+  assert.equal(Object.hasOwn(manifest, "apps"), false);
+  assert.equal(Object.hasOwn(manifest.interface, "screenshots"), false);
   assert.equal(manifest.interface.displayName, "Hamster");
 });
 
-test("excluding a skill drops it and keeps the rest", async () => {
-  const cwd = await makeTemp("hamster-plugin-bundle-exclude-");
+test("two builds of one checkout produce byte-identical archives", async () => {
+  const cwd = await makeTemp("hamster-plugin-bundle-repeat-");
   await copyPackage(cwd);
-  const totalSkills = (await readdir(path.join(cwd, "skills"))).length;
+  await commitPackage(cwd);
 
-  const { result, zipPath } = await buildCodexBundle(cwd, ["--exclude", "setup"]);
-  assert.equal(result.code, 0, result.stderr);
+  const first = await buildCodexBundle(cwd);
+  assert.equal(first.result.code, 0, first.result.stderr);
+  const firstDigest = createHash("sha256").update(await readFile(first.zipPath)).digest("hex");
 
-  const entries = await zipEntries(zipPath);
-  assert.ok(!entries.includes("skills/setup/SKILL.md"));
-  const skillFiles = entries.filter((entry) => /^skills\/[^/]+\/SKILL\.md$/.test(entry));
-  assert.equal(skillFiles.length, totalSkills - 1);
+  const second = await buildCodexBundle(cwd);
+  assert.equal(second.result.code, 0, second.result.stderr);
+  const secondDigest = createHash("sha256").update(await readFile(second.zipPath)).digest("hex");
+
+  assert.equal(firstDigest, secondDigest);
+});
+
+test("an uncommitted bundle source stops the build", async () => {
+  const cwd = await makeTemp("hamster-plugin-bundle-dirty-");
+  await copyPackage(cwd);
+  await commitPackage(cwd);
+  const skillPath = path.join(cwd, "skills", "ship", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+
+  const { result, zipPath } = await buildCodexBundle(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Commit or stash the bundle sources first/);
+  assert.match(result.stderr, /skills\/ship\/SKILL\.md/);
+  assert.equal(await pathExists(zipPath), false);
 });
 
 test("failed hamster status prints to stderr and stdout stays SETUP_NEEDED", async () => {

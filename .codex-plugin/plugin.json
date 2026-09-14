@@ -9,6 +9,7 @@
   "homepage": "https://tryhamster.com",
   "repository": "https://github.com/gethamster/plugin",
   "mcpServers": "./.mcp.json",
+  "skills": "./skills/",
   "license": "MIT",
   "keywords": [
     "hamster",
