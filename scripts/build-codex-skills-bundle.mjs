@@ -14,6 +14,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -250,6 +251,29 @@ function writeZip(stagingDir, zipPath, members) {
   }
 }
 
+// zip warns and continues on a file it cannot read, so the shipped member list
+// is checked against the staged one rather than assumed. obra/superpowers greps
+// its archive listing for source-only paths; an allowlist is available here, so
+// this compares the whole set instead.
+async function verifyArchive(zipPath, members) {
+  const listing = execFileSync("unzip", ["-Z1", zipPath], { encoding: "utf8" });
+  const shipped = listing
+    .split("\n")
+    .map((line) => line.replace(/\/$/, ""))
+    .filter(Boolean)
+    .sort();
+
+  const missing = members.filter((member) => !shipped.includes(member));
+  const extra = shipped.filter((member) => !members.includes(member));
+  if (missing.length > 0 || extra.length > 0) {
+    throw new Error(
+      `The archive does not match what was staged. Missing: ${missing.join(", ") || "none"}. Unexpected: ${extra.join(", ") || "none"}.`
+    );
+  }
+
+  return createHash("sha256").update(await fs.readFile(zipPath)).digest("hex");
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
 
@@ -281,7 +305,11 @@ async function main() {
   await fs.rm(zipPath, { force: true });
   writeZip(stagingDir, zipPath, members);
 
+  const checksum = await verifyArchive(zipPath, members);
+
   console.log(`Wrote ${path.relative(repoRoot, zipPath)}`);
+  console.log(`Entries: ${members.length}`);
+  console.log(`SHA-256: ${checksum}`);
   console.log(`Skills: ${skillNames.join(", ")}`);
 }
 
