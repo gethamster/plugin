@@ -647,6 +647,25 @@ async function validateMcpFiles() {
   }
 }
 
+// The four plugin manifests are hand-maintained copies of one package summary.
+// The Codex copy also ships inside the skills-only bundle, so the summary must
+// read true for an install with no MCP connector, and binding the four means
+// that wording cannot be re-synced away by hand.
+async function validateDescriptionParity() {
+  const descriptions = new Map();
+  for (const file of ["plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
+    const manifest = await readJsonFile(path.join(repoRoot, file), file);
+    if (manifest && typeof manifest.description === "string") {
+      descriptions.set(file, manifest.description);
+    }
+  }
+
+  const distinct = new Set(descriptions.values());
+  if (distinct.size > 1) {
+    addError(`Plugin descriptions have drifted across manifests: ${[...descriptions.keys()].join(", ")}.`);
+  }
+}
+
 async function validateNoAntigravityNest() {
   // Antigravity discovers workspace plugins under both .agents/plugins/ and
   // _agents/plugins/. Either nest would reintroduce the deleted Antigravity-only
@@ -837,6 +856,7 @@ async function main() {
     await validateDuplicateParity();
     await validateSkillSizeBudget();
     await validateLayout();
+    await validateDescriptionParity();
     {
       const { errors: adapterErrors } = await syncAdapters({ check: true });
       for (const error of adapterErrors) {

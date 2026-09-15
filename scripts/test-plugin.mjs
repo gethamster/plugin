@@ -272,6 +272,18 @@ test("a Codex catalog category that drifts from the manifest fails validation", 
   assert.match(result.stderr, /category "Productivity" does not match \.codex-plugin\/plugin\.json interface\.category "Developer Tools"/);
 });
 
+test("a plugin description that drifts from its siblings fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-description-drift-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.description = `${manifest.description} Ask Hamster over hosted MCP.`;
+  });
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Plugin descriptions have drifted across manifests/);
+});
+
 test("an empty Codex logoDark fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-logodark-");
   await copyPackage(cwd);

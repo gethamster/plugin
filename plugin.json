@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "hamster",
   "version": "3.4.3",
-  "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster over hosted MCP; setup, ship, plan, resume, review, QA, and retro.",
+  "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
   "author": {
     "name": "Hamster",
     "email": "hello@tryhamster.com"
