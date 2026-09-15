@@ -594,6 +594,14 @@ async function validateCodex(version) {
     addError('Codex plugin.json "license" must be "MIT".');
   }
 
+  // developer_name_defaulted: the portal substitutes the verified identity for
+  // both fields unless they already match.
+  if (manifest.author?.name !== manifest.interface.developerName) {
+    addError(
+      `Codex plugin.json author.name (${JSON.stringify(manifest.author?.name)}) must equal interface.developerName (${JSON.stringify(manifest.interface.developerName)}).`
+    );
+  }
+
   requireVersionParity("Codex plugin.json", manifest.version, version);
 
   return manifest.interface.category;
@@ -636,6 +644,25 @@ async function validateMcpFiles() {
   if (distinct.size > 1) {
     const listing = [...urls.entries()].map(([file, url]) => `${file}=${url}`).join(", ");
     addError(`MCP endpoint URLs have drifted across dialect files: ${listing}.`);
+  }
+}
+
+// The four plugin manifests are hand-maintained copies of one package summary.
+// The Codex copy also ships inside the skills-only bundle, so the summary must
+// read true for an install with no MCP connector, and binding the four means
+// that wording cannot be re-synced away by hand.
+async function validateDescriptionParity() {
+  const descriptions = new Map();
+  for (const file of ["plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
+    const manifest = await readJsonFile(path.join(repoRoot, file), file);
+    if (manifest && typeof manifest.description === "string") {
+      descriptions.set(file, manifest.description);
+    }
+  }
+
+  const distinct = new Set(descriptions.values());
+  if (distinct.size > 1) {
+    addError(`Plugin descriptions have drifted across manifests: ${[...descriptions.keys()].join(", ")}.`);
   }
 }
 
@@ -829,6 +856,7 @@ async function main() {
     await validateDuplicateParity();
     await validateSkillSizeBudget();
     await validateLayout();
+    await validateDescriptionParity();
     {
       const { errors: adapterErrors } = await syncAdapters({ check: true });
       for (const error of adapterErrors) {

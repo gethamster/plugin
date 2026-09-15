@@ -7,7 +7,7 @@ description: Ask Hamster to connect the current code or editor context with work
 
 **Request**: "$ARGUMENTS"
 
-Prefer the hosted Hamster MCP server this plugin already exposes (`https://tryhamster.com/mcp`). Call the Hamster `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
+If this client has the Hamster MCP tools (hosted at `https://tryhamster.com/mcp`), call the `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
 
 If Hamster MCP tools are unavailable, use `hamster chat` when the CLI is installed and signed in — same ask path, different transport:
 
@@ -15,7 +15,7 @@ If Hamster MCP tools are unavailable, use `hamster chat` when the CLI is install
 hamster chat "<request>"
 ```
 
-For a genuine follow-up on that CLI path, use `hamster chat --continue "<follow-up>"`. If MCP is unavailable and the CLI is not ready, tell the user to finish the client's Hamster sign-in prompt, or run setup / `hamster auth login`.
+For a genuine follow-up on that CLI path, use `hamster chat --continue "<follow-up>"`. If MCP is unavailable and the CLI is not ready, tell the user to finish the client's Hamster sign-in prompt, or to follow the setup skill or https://tryhamster.com/plugin/install and run `hamster auth login`.
 
 If `$ARGUMENTS` is empty, ask the user what they want to ask Hamster.
 

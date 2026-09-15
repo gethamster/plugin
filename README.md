@@ -1,8 +1,8 @@
 # Hamster
 
-**Install Hamster.** One plugin. Talk through hosted MCP. Keep the plan on disk, then ship from it.
+**Install Hamster.** One plugin. Talk through hosted MCP or the CLI. Keep the plan on disk, then ship from it.
 
-This is the Hamster product: Agent Plugins skills and hosted MCP on every supported client, plus generated native execution workers on Claude Code where that client registers them. The CLI is how the plan stays in this repo. It is not a second install.
+This is the Hamster product: Agent Plugins skills on every supported client, hosted MCP on every client that installs from GitHub or a marketplace, plus generated native execution workers on Claude Code where that client registers them. The CLI is how the plan stays in this repo. It is not a second install.
 
 ## Install
 
@@ -38,6 +38,10 @@ codex plugin add hamster@hamster-plugins
 
 You can also launch `codex`, run `/plugins`, and install `hamster@hamster-plugins`.
 
+### Codex Plugins Directory
+
+The Hamster listing in Codex's Plugins Directory is a skills-only build of this same skills tree, produced by `node scripts/build-codex-skills-bundle.mjs`. A directory install carries the skills and nothing else, so it does not register the hosted MCP connector: Ask Hamster answers through `hamster chat` there unless you add the connector yourself, as described in [Advanced: hosted MCP without the plugin](#advanced-hosted-mcp-without-the-plugin). The GitHub and marketplace installs above are unaffected and keep the connector.
+
 ### Antigravity
 
 From this repository:
@@ -72,7 +76,7 @@ Claude Code lists these as `/hamster:<skill>`. Cursor lists them as `/<skill>`. 
 | Skill | Persona | Description |
 |-------|---------|-------------|
 | `/hamster:setup` | — | Install the CLI, sign in, and sync the plan into this repo |
-| `/hamster:ask-hamster [request]` | Workspace Copilot | Connect current code with workspace priorities, blockers, blueprints, or related work (hosted MCP preferred; `hamster chat` fallback) |
+| `/hamster:ask-hamster [request]` | Workspace Copilot | Connect current code with workspace priorities, blockers, blueprints, or related work (hosted MCP when the client has it; `hamster chat` otherwise) |
 | `/hamster:ship [slug-or-url]` | Release Engineer | Ship a brief: merge base, implement in parallel, test, review, bisectable commits, PR |
 | `/hamster:plan-hamster [slug-or-url]` | Tech Lead + CEO/Eng modes | Analyze brief with optional founder or architecture review |
 | `/hamster:resume-hamster [slug]` | — | Resume interrupted execution from where you left off |
@@ -88,7 +92,7 @@ The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is i
 
 #### `/hamster:ask-hamster`
 
-The direct gateway to Hamster's connected workspace context. Prefer the hosted Hamster MCP server this plugin already configured; if those tools are unavailable, `hamster chat` is the same ask path over the CLI. Explicit requests can also perform supported workspace actions:
+The direct gateway to Hamster's connected workspace context. Uses the Hamster MCP tools when the client has them; otherwise `hamster chat` is the same ask path over the CLI. Explicit requests can also perform supported workspace actions:
 
 ```
 /hamster:ask-hamster I'm modifying auth middleware in apps/web/app/api/. What does our blueprint say about third-party integrations?

@@ -1,7 +1,7 @@
 {
   "name": "hamster",
-  "version": "3.4.2",
-  "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster over hosted MCP; setup, ship, plan, resume, review, QA, and retro.",
+  "version": "3.4.3",
+  "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
   "author": {
     "name": "Hamster",
     "email": "hello@tryhamster.com"
@@ -9,6 +9,7 @@
   "homepage": "https://tryhamster.com",
   "repository": "https://github.com/gethamster/plugin",
   "mcpServers": "./.mcp.json",
+  "skills": "./skills/",
   "license": "MIT",
   "keywords": [
     "hamster",
@@ -20,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "The spec layer for Codex",
-    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. It also configures the hosted Hamster MCP server at https://tryhamster.com/mcp, which can search and read briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context.",
+    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. Ask Hamster reads briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context over the Hamster CLI, and over the hosted Hamster MCP server at https://tryhamster.com/mcp in clients that have those tools.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
