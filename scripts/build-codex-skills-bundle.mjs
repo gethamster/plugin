@@ -38,12 +38,11 @@ const FORBIDDEN_FILENAMES = new Set([
   "server.json",
 ]);
 
-// Paths the bundle is built from. A build reads these and nothing else, so a
-// clean checkout of them is what makes the artifact traceable to a commit.
-const SOURCE_PATHS = [".codex-plugin/plugin.json", "skills", "assets", "LICENSE"];
-
-// zip stores DOS timestamps, so staged files are normalized to a fixed date and
-// fed in sorted order; two builds of one tree then produce identical bytes.
+// zip writes DOS timestamps, which have no timezone and 2-second granularity, so
+// staged files are normalized to a fixed instant and zipped under TZ=UTC. Modes
+// are pinned too, because the external-attributes field carries the unix mode
+// and -X does not normalize it. Without all three the bytes depend on the
+// machine, not the commit.
 const FIXED_MTIME = new Date("2020-01-01T00:00:00Z");
 
 function parseArgs(argv) {
@@ -85,10 +84,21 @@ async function pathExists(targetPath) {
   }
 }
 
-function requireCleanSources() {
+// Whole-tree, the way np, npm version, and release-it gate a release: a build
+// reads the manifest, the skills, the assets, the license, the version, and the
+// validator, and a per-path allowlist of that set is one more thing to keep in
+// step with what the build actually touches. Only the build's own output is
+// excused, so the guard does not depend on .gitignore naming whichever --out ran.
+function requireCleanCheckout(outDir) {
+  const pathspec = ["."];
+  const relativeOut = path.relative(repoRoot, outDir);
+  if (relativeOut && !relativeOut.startsWith("..") && !path.isAbsolute(relativeOut)) {
+    pathspec.push(`:(exclude)${relativeOut}`, `:(exclude,glob)${relativeOut}/**`);
+  }
+
   let status;
   try {
-    status = execFileSync("git", ["status", "--porcelain", "--", ...SOURCE_PATHS], {
+    status = execFileSync("git", ["status", "--porcelain", "--", ...pathspec], {
       cwd: repoRoot,
       encoding: "utf8",
     });
@@ -100,7 +110,7 @@ function requireCleanSources() {
 
   if (status.trim()) {
     throw new Error(
-      `Commit or stash the bundle sources first; otherwise the artifact matches no commit:\n${status.trimEnd()}`
+      `Commit or stash your changes first; otherwise the artifact matches no commit:\n${status.trimEnd()}`
     );
   }
 }
@@ -148,8 +158,6 @@ async function stageBundle(stagingDir, skillNames) {
     dereference: true,
   });
   await fs.cp(path.join(repoRoot, "LICENSE"), path.join(stagingDir, "LICENSE"));
-
-  return manifest;
 }
 
 async function walkFiles(dir) {
@@ -166,13 +174,17 @@ async function walkFiles(dir) {
   return files;
 }
 
-async function verifyStaging(stagingDir, manifest, skillNames) {
+// Reads the manifest back off disk: the point is to check the bytes that ship,
+// not the object the staging step just deleted keys from.
+async function verifyStaging(stagingDir, skillNames) {
   for (const name of skillNames) {
     const skillFile = path.join(stagingDir, "skills", name, "SKILL.md");
     if (!(await pathExists(skillFile))) {
       throw new Error(`Staged skill has no SKILL.md: ${skillFile}`);
     }
   }
+
+  const manifest = await readJsonFile(path.join(stagingDir, ".codex-plugin", "plugin.json"));
 
   for (const key of EXCLUDED_MANIFEST_KEYS) {
     if (manifest[key] !== undefined) {
@@ -205,37 +217,30 @@ async function verifyStaging(stagingDir, manifest, skillNames) {
       throw new Error(`A skills-only bundle must not carry MCP or app configuration: ${file}`);
     }
   }
-
-  if (manifest.author?.name !== manifest.interface?.developerName) {
-    throw new Error(
-      `author.name (${JSON.stringify(manifest.author?.name)}) must equal interface.developerName (${JSON.stringify(manifest.interface?.developerName)}).`
-    );
-  }
 }
 
-async function normalizeTimes(stagingDir) {
+async function normalizeStaging(stagingDir) {
   const files = await walkFiles(stagingDir);
-  const dirs = new Set();
   for (const file of files) {
+    const { mode } = await fs.stat(file);
+    await fs.chmod(file, mode & 0o111 ? 0o755 : 0o644);
     await fs.utimes(file, FIXED_MTIME, FIXED_MTIME);
-    for (let dir = path.dirname(file); dir.startsWith(stagingDir); dir = path.dirname(dir)) {
-      dirs.add(dir);
-    }
   }
-  for (const dir of [...dirs].sort().reverse()) {
-    await fs.utimes(dir, FIXED_MTIME, FIXED_MTIME);
-  }
+  // -@ archives exactly the paths it is given, so directory entries never reach
+  // the zip and their timestamps cannot affect it.
   return files.map((file) => path.relative(stagingDir, file)).sort();
 }
 
 function writeZip(stagingDir, zipPath, members) {
   try {
     // -X drops uid/gid and extended attributes; -@ takes the sorted member list
-    // on stdin. The plugin root sits at the archive root, one of the two layouts
-    // plugin_root_ambiguous accepts.
+    // on stdin; TZ=UTC fixes how the normalized mtimes land in DOS timestamps,
+    // which carry no timezone of their own. The plugin root sits at the archive
+    // root, one of the two layouts plugin_root_ambiguous accepts.
     execFileSync("zip", ["-X", "-q", "-@", zipPath], {
       cwd: stagingDir,
       input: `${members.join("\n")}\n`,
+      env: { ...process.env, TZ: "UTC" },
     });
   } catch (error) {
     if (error?.code === "ENOENT") {
@@ -257,20 +262,20 @@ async function main() {
     stdio: "inherit",
   });
 
-  requireCleanSources();
+  const outDir = path.resolve(repoRoot, options.out);
+  requireCleanCheckout(outDir);
 
   const { version } = await readJsonFile(path.join(repoRoot, "plugin.json"));
   if (!version) {
     throw new Error("Root plugin.json has no version.");
   }
 
-  const outDir = path.resolve(repoRoot, options.out);
   const stagingDir = path.join(outDir, "codex-skills-only");
   const skillNames = await listSkillNames();
 
-  const manifest = await stageBundle(stagingDir, skillNames);
-  await verifyStaging(stagingDir, manifest, skillNames);
-  const members = await normalizeTimes(stagingDir);
+  await stageBundle(stagingDir, skillNames);
+  await verifyStaging(stagingDir, skillNames);
+  const members = await normalizeStaging(stagingDir);
 
   const zipPath = path.join(outDir, `hamster-codex-skills-only-${version}.zip`);
   await fs.rm(zipPath, { force: true });

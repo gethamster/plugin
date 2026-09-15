@@ -330,20 +330,27 @@ test("the Codex bundle carries only skills, assets, and a stripped manifest", as
   assert.equal(manifest.interface.displayName, "Hamster");
 });
 
-test("two builds of one checkout produce byte-identical archives", async () => {
+test("archive bytes follow the checkout, not the machine building it", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-repeat-");
   await copyPackage(cwd);
   await commitPackage(cwd);
 
-  const first = await buildCodexBundle(cwd);
-  assert.equal(first.result.code, 0, first.result.stderr);
-  const firstDigest = createHash("sha256").update(await readFile(first.zipPath)).digest("hex");
+  // A reviewer rebuilding the branch to compare hashes runs under their own
+  // umask and timezone, and zip records both unless the build pins them.
+  const digests = [];
+  for (const shell of ["umask 022; TZ=UTC", "umask 002; TZ=Asia/Tokyo"]) {
+    const result = await run(
+      "sh",
+      ["-c", `${shell}; "${process.execPath}" "${bundleBuilderPath}" --out dist`],
+      { cwd }
+    );
+    assert.equal(result.code, 0, result.stderr);
+    const version = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
+    const zipPath = path.join(cwd, "dist", `hamster-codex-skills-only-${version}.zip`);
+    digests.push(createHash("sha256").update(await readFile(zipPath)).digest("hex"));
+  }
 
-  const second = await buildCodexBundle(cwd);
-  assert.equal(second.result.code, 0, second.result.stderr);
-  const secondDigest = createHash("sha256").update(await readFile(second.zipPath)).digest("hex");
-
-  assert.equal(firstDigest, secondDigest);
+  assert.equal(digests[0], digests[1]);
 });
 
 test("an uncommitted bundle source stops the build", async () => {
@@ -355,7 +362,7 @@ test("an uncommitted bundle source stops the build", async () => {
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Commit or stash the bundle sources first/);
+  assert.match(result.stderr, /Commit or stash your changes first/);
   assert.match(result.stderr, /skills\/ship\/SKILL\.md/);
   assert.equal(await pathExists(zipPath), false);
 });

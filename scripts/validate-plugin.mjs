@@ -594,6 +594,14 @@ async function validateCodex(version) {
     addError('Codex plugin.json "license" must be "MIT".');
   }
 
+  // developer_name_defaulted: the portal substitutes the verified identity for
+  // both fields unless they already match.
+  if (manifest.author?.name !== manifest.interface.developerName) {
+    addError(
+      `Codex plugin.json author.name (${JSON.stringify(manifest.author?.name)}) must equal interface.developerName (${JSON.stringify(manifest.interface.developerName)}).`
+    );
+  }
+
   requireVersionParity("Codex plugin.json", manifest.version, version);
 
   return manifest.interface.category;
