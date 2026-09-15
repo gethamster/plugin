@@ -27,8 +27,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # The build is deterministic, so naming the artifact after the commit is
-          # what tells two downloads apart before anyone unzips them.
-          name: codex-skills-only-bundle-${{ github.sha }}
+          # what tells two downloads apart before anyone unzips them. On pull_request
+          # runs github.sha is the throwaway merge commit; the head SHA is the one a
+          # reviewer can check out and rebuild.
+          name: codex-skills-only-bundle-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/*.zip
 
   # Bumping "version" in the root plugin.json on main publishes plugin-v<version>,
