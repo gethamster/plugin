@@ -63,6 +63,8 @@ agy plugin uninstall hamster
 agy plugin install https://github.com/gethamster/plugin
 ```
 
+In the Antigravity app (2.15 or newer), authenticate `hamster_hamster` under Settings → Customizations → Installed MCP Servers. The plugin registers that server itself, so a manual `hamster` entry in `mcp_config.json` would add a second copy of every tool.
+
 ## After install
 
 1. **Talk** — hosted MCP at `https://tryhamster.com/mcp`, or `hamster chat` when MCP tools are unavailable and the CLI is signed in. Your client owns the Hamster sign-in.
