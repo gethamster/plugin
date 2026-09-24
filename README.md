@@ -275,7 +275,7 @@ Skills read `.hamster/` in the current repo:
 
 Skills take the account directory name from `account_slug` in `.state.json`. `HAMSTER_ACCOUNT_ID` holds an account UUID, so when it is set the skills check it against `account_id` and stop rather than guess.
 
-The hosted MCP tools work on one active team per user, which isn't tied to any repo. So before their first Hamster MCP call, and before each ask or change, the ask, ship, plan, and resume skills call `switch_account` with this repo's `account_slug`. Otherwise a user in more than one team can get "not found" for tasks that exist. The server stores that choice per user, so switching also changes the team your other Hamster MCP clients use until they switch again. If the team was renamed since `hamster init`, the skills switch to its new slug by team id and ask you to run `hamster init --force --account-id <id>` to refresh the local state.
+The hosted MCP tools work on one active team per user, which isn't tied to any repo. So before their first Hamster MCP call, and before each ask or change, the ask, ship, plan, and resume skills call `switch_account` with this repo's `account_slug`. Otherwise a user in more than one team can get "not found" for tasks that exist. The server stores that choice per user, so switching also changes the team your other Hamster MCP clients use until they switch again. If the switch fails, the skills stop and point you at `hamster init --force` or the right MCP sign-in.
 
 ## Advanced: hosted MCP without the plugin
 

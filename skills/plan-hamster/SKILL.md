@@ -31,9 +31,9 @@ If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`
 
 ## Select and Schedule
 
-Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Before any Hamster MCP call, `switch_account` to the resolved slug per [mcp-account](references/mcp-account.md). The resolved slug is the filesystem `$account`: shell-quote it into every block you run from that reference, and never use it as `HAMSTER_ACCOUNT_ID`.
+Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Before any Hamster MCP call, `switch_account` to the resolved slug. If that fails, make no more Hamster MCP calls; stop with the guidance in [mcp-account](references/mcp-account.md). The resolved slug is the filesystem `$account`: shell-quote it into every block you run from that reference, and never use it as `HAMSTER_ACCOUNT_ID`.
 
-Then follow **Brief Selection** and **Scheduling** in [brief-selection](references/brief-selection.md) exactly as written (argument parsing, brief picker, inline frontmatter parse, wave grouping) — but stop after producing the schedule; do not confirm execution.
+Then follow **Brief Selection** and **Scheduling** in [brief-selection](references/brief-selection.md) exactly as written, but stop after producing the schedule; do not confirm execution.
 
 Additionally read the brief body (`brief.md`) and skim the parent task bodies to inform the analysis below.
 
