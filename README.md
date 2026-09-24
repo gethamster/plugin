@@ -20,7 +20,7 @@ On Enterprise, an admin must allow marketplace imports. Once Hamster is on the C
 /add-plugin hamster
 ```
 
-Grok Bot is not a separate Hamster package. It uses the same Cursor account and plugin library, so the Cursor install above is the Grok Bot install. Do not run `/add-plugin` in the Grok Bot chat. If Grok Bot shows "Complete GitHub auth to sync installed plugins", finish GitHub auth from Marketplace → Your plugins.
+Grok Bot is not a separate Hamster package. It uses the same Cursor account and plugin library, so the Cursor install above is the Grok Bot install. Do not run `/add-plugin` in the Grok Bot chat. If Grok Bot shows "Complete GitHub auth to sync installed plugins", complete GitHub auth when Grok Bot asks.
 
 ### Claude Code
 
