@@ -186,7 +186,7 @@ Produces: metrics table, hourly distribution, session analysis, hotspots, PR siz
 
 Canonical worker protocols live in `skills/ship/references/agents/`. Root `agents/task-executor.md` and `agents/wave-reviewer.md` are generated Claude Code native adapters (registration + model metadata) over those bodies — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code does), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
 
-Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`); it is not part of the installed skill surface.
+Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, protocols under `references/` that plan-hamster and resume-hamster re-enter, and the MCP account step shared with ask-hamster — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`); it is not part of the installed skill surface.
 
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 
@@ -195,6 +195,7 @@ Every skill directory is self-contained: no SKILL.md reads a sibling skill's fil
 | `skills/setup/scripts/ensure-ready.sh` | `ship`, `plan-hamster`, `resume-hamster` |
 | `skills/setup/scripts/ensure-ready.ps1` | `ship`, `plan-hamster`, `resume-hamster` |
 | `skills/ship/references/brief-selection.md` | `plan-hamster`, `resume-hamster` |
+| `skills/ask-hamster/references/mcp-account.md` | `ship`, `plan-hamster`, `resume-hamster` |
 | `skills/ship/references/execution-loop.md` | `resume-hamster` |
 | `skills/ship/references/agents/task-executor.md` | `resume-hamster` |
 | `skills/ship/references/agents/wave-reviewer.md` | `resume-hamster` |
@@ -274,7 +275,7 @@ Skills read `.hamster/` in the current repo:
 
 Skills take the account directory name from `account_slug` in `.state.json`. `HAMSTER_ACCOUNT_ID` holds an account UUID, so when it is set the skills check it against `account_id` and stop rather than guess.
 
-The hosted MCP tools work on one active team per user, which isn't tied to any repo. So before their first Hamster MCP call, the ask, ship, plan, and resume skills call `switch_account` with this repo's `account_slug`. Otherwise a user in more than one team can get "not found" for tasks that exist.
+The hosted MCP tools work on one active team per user, which isn't tied to any repo. So before their first Hamster MCP call, and before each ask or change, the ask, ship, plan, and resume skills call `switch_account` with this repo's `account_slug`. Otherwise a user in more than one team can get "not found" for tasks that exist.
 
 ## Advanced: hosted MCP without the plugin
 
