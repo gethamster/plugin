@@ -7,7 +7,9 @@ description: Ask Hamster to connect the current code or editor context with work
 
 **Request**: "$ARGUMENTS"
 
-If this client has the Hamster MCP tools (hosted at `https://tryhamster.com/mcp`), call the `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
+If this client has the Hamster MCP tools (hosted at `https://tryhamster.com/mcp`), point them at this repository's team before the first Hamster MCP call in this session (even `get_task` or `search`), and again before each `ask_hamster` call or any call that creates or changes Hamster data: if `.hamster/.state.json` exists at the repository root (`git rev-parse --show-toplevel`) and the tools include `switch_account`, call it with the file's `account_slug`. If that fails or doesn't return the file's `account_id`, make no more Hamster MCP calls (not even `list_accounts`, or a switch to another team with the same name), don't fall back to `hamster chat`, and don't look the item up anywhere else (including the web): tell the user in one line that this repository's Hamster team (`<account_slug>`) isn't available to this MCP sign-in, and to run `hamster init --force` here or sign in to Hamster MCP as the right user, then stop. Read [mcp-account](references/mcp-account.md) for the reasons behind these rules.
+
+Then call the `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
 
 If Hamster MCP tools are unavailable, use `hamster chat` when the CLI is installed and signed in — same ask path, different transport:
 
