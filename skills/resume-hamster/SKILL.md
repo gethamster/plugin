@@ -60,7 +60,7 @@ done
 
 Resolution order:
 1. **Argument provided** → use it as the slug (verify `brief.md` exists)
-2. **Branch matches** `feature/ham-{n}-{slug}` → extract the slug
+2. **Branch matches** `feature/{key}-{n}-{slug}` (`{key}` is the tasks' display ID key, lowercased, e.g. `ham`, `acme`) → extract the slug
 3. **One brief** has in_progress tasks → use it; **multiple** → ask the user
 4. **None** → tell the user nothing to resume; suggest `/hamster:ship`
 
@@ -96,7 +96,7 @@ Resuming: {title}
 
 ## Continue
 
-Verify the branch first: if not on `feature/ham-{n}-{slug}`, ask whether to switch or create it.
+Verify the branch first: if not on `feature/{key}-{n}-{slug}`, ask whether to switch or create it.
 
 Dirty working tree not attributable to an in_progress task → show the changes, ask: commit as part of current task / stash / discard.
 

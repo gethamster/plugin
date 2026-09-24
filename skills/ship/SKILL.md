@@ -75,8 +75,8 @@ Follow **Brief Selection** and **Scheduling** in [brief-selection](references/br
 One call:
 
 ```bash
-lowest_id=$(ls "$tasks_dir"/*.md 2>/dev/null | xargs -I{} basename {} | grep -oE 'ham-[0-9]+' | sed 's/ham-//' | sort -n | head -1)
-branch="feature/ham-${lowest_id}-${slug}"
+lowest_id=$(ls "$tasks_dir"/*.md 2>/dev/null | xargs -n1 basename | grep -oE '^[a-z][a-z0-9]*-[0-9]+' | sort -t- -k2,2n | head -1)
+branch="feature/${lowest_id}-${slug}"
 git checkout -b "$branch"
 default_branch=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null || echo "main")
 git fetch origin "$default_branch" && git merge "origin/$default_branch" --no-edit

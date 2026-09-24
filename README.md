@@ -133,7 +133,7 @@ After analysis, choose a review mode:
 
 #### `/hamster:resume-hamster`
 
-Resumes an interrupted execution. Auto-detects the brief from the git branch name (`feature/ham-{id}-{slug}`), in-progress tasks, or a provided argument.
+Resumes an interrupted execution. Auto-detects the brief from the git branch name (`feature/{key}-{id}-{slug}`), in-progress tasks, or a provided argument.
 
 ```
 /hamster:resume-hamster
@@ -216,7 +216,7 @@ Post-wave (orchestrator):
 
 ### Git conventions
 
-- **Branch**: `feature/ham-{lowest-id}-{brief-slug}`
+- **Branch**: `feature/{key}-{lowest-id}-{brief-slug}`, where `{key}` is the task display ID's key, lowercased (`HAM-42` → `feature/ham-42-…`, `ACME-7` → `feature/acme-7-…`)
 - **Parent task commits**: `feat(ham-123): concise description` (split by concern for bisectability)
 - **Simplification commits**: `refactor(ham-123): simplify description`
 - **Review fix commits**: `fix(ham-123): address review findings`
