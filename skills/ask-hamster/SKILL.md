@@ -7,7 +7,7 @@ description: Ask Hamster to connect the current code or editor context with work
 
 **Request**: "$ARGUMENTS"
 
-If this client has the Hamster MCP tools (hosted at `https://tryhamster.com/mcp`), first point them at this repository's team with [mcp-account](references/mcp-account.md). Then call the `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
+If this client has the Hamster MCP tools (hosted at `https://tryhamster.com/mcp`), point them at this repository's team before any Hamster MCP call, including `get_task` or `search`: if `.hamster/.state.json` exists at the repository root, call `switch_account` with its `account_slug`. Without that file, don't switch. [mcp-account](references/mcp-account.md) covers failures and when to switch again. Then call the `ask_hamster` tool (or the client's equivalent Hamster MCP ask tool) with the request. Include local working context Hamster cannot see on its own: file paths, the current branch and diff, error messages, and the code under discussion.
 
 If Hamster MCP tools are unavailable, use `hamster chat` when the CLI is installed and signed in — same ask path, different transport:
 

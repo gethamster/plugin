@@ -33,7 +33,7 @@ If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`
 
 ## Setup
 
-Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Then run prerequisites and live sync in ONE bash call, assigning `account` to the resolved filesystem slug (shell-quoted), not `HAMSTER_ACCOUNT_ID`:
+Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Before any Hamster MCP call, `switch_account` to the resolved slug per [mcp-account](references/mcp-account.md). Then run prerequisites and live sync in ONE bash call, assigning `account` to the resolved filesystem slug (shell-quoted), not `HAMSTER_ACCOUNT_ID`:
 
 ```bash
 export PATH="$HOME/.hamster/bin:$PATH"
