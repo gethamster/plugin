@@ -698,6 +698,12 @@ const DUPLICATE_GROUPS = [
     "skills/plan-hamster/references/brief-selection.md",
     "skills/resume-hamster/references/brief-selection.md",
   ],
+  [
+    "skills/ask-hamster/references/mcp-account.md",
+    "skills/ship/references/mcp-account.md",
+    "skills/plan-hamster/references/mcp-account.md",
+    "skills/resume-hamster/references/mcp-account.md",
+  ],
   ["skills/ship/references/execution-loop.md", "skills/resume-hamster/references/execution-loop.md"],
   ["skills/ship/references/agents/task-executor.md", "skills/resume-hamster/references/agents/task-executor.md"],
   ["skills/ship/references/agents/wave-reviewer.md", "skills/resume-hamster/references/agents/wave-reviewer.md"],

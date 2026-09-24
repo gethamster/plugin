@@ -274,6 +274,8 @@ Skills read `.hamster/` in the current repo:
 
 Skills take the account directory name from `account_slug` in `.state.json`. `HAMSTER_ACCOUNT_ID` holds an account UUID, so when it is set the skills check it against `account_id` and stop rather than guess.
 
+The hosted MCP tools work on one active team per user, which isn't tied to any repo. So before their first Hamster MCP call, the ask, ship, plan, and resume skills call `switch_account` with this repo's `account_slug`. Otherwise a user in more than one team can get "not found" for tasks that exist.
+
 ## Advanced: hosted MCP without the plugin
 
 Use this only when you want the hosted MCP tools in a client without installing the plugin. Add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth; see the [MCP server docs](https://tryhamster.com/docs/hamster-studio/mcp) for setup, the tool list, and client registration. Skills, slash commands, the CLI, and `/ship` come with the plugin.
