@@ -61,27 +61,27 @@ Otherwise launch one isolated **wave-reviewer** with: wave number, parent IDs, p
 
 ### 4. Commit Wave (bisectable, per parent, sequential)
 
-For each parent: stage ONLY that parent's files (plus its simplifications). Split into logical commits when changes span concerns (infra → types → logic → UI → tests); a cohesive change gets one commit:
+For each parent: stage ONLY that parent's files (plus its simplifications). Split into logical commits when changes span concerns (infra → types → logic → UI → tests); a cohesive change gets one commit. `{KEY}-{id}` is the parent's display ID (`HAM-42`, `ACME-7`) and `{key}` its key lowercased, so subjects read `feat(ham-42): …` or `feat(acme-7): …`:
 
 ```bash
 git add {specific files}
 git diff --cached --name-only   # verify staging
-git commit -m "feat(ham-{id}): {concise description}
+git commit -m "feat({key}-{id}): {concise description}
 
 - {key change}
 
-Task: HAM-{id}
+Task: {KEY}-{id}
 Brief: {slug}"
 ```
 
 - **NEVER** `git add .` / `git add -A`; never stage `.env*`, `.hamster/.state.json`, keys/secrets
 - Pre-commit hook fails → fix the issue, new commit; never `--no-verify`
-- Simplification changes commit as `refactor(ham-{id}): simplify post-review`
+- Simplification changes commit as `refactor({key}-{id}): simplify post-review`
 
 ### 5. Progress Report
 
 ```
-Wave {n} complete: HAM-{id} ✓ ({c} commits), HAM-{id} ✓ ({c} commits)
+Wave {n} complete: {KEY}-{id} ✓ ({c} commits), {KEY}-{id} ✓ ({c} commits)
 Remaining: {n} waves, {n} parents
 ```
 
