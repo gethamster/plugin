@@ -8,6 +8,6 @@ Skip this when the client has no Hamster MCP tools, when they include no `switch
 
 1. Take `account_slug` from `.hamster/.state.json` at the repository root. If Account Resolution already ran, its `ACCOUNT_RESOLVED` value is that slug.
 2. Call `switch_account` with `{"account_slug": "<slug>"}`. Don't check first: `list_accounts` doesn't say which team is active, and switching to the active team is harmless.
-3. Continue only if it succeeds. If it fails for any reason, make no further Hamster MCP calls, including `list_accounts`, and don't pick another team yourself, even one with the same name. Tell the user in one line that this repository's Hamster team (`<slug>`) isn't available to this MCP sign-in, and to run `hamster init --force` in the repository or sign in to Hamster MCP as the right user. Then stop.
+3. Continue only if it succeeds. If it fails for any reason, make no further Hamster MCP calls, including `list_accounts`, don't pick another team yourself, even one with the same name, and don't look the item up anywhere else (CLI, web). `hamster chat` takes its team from the CLI's own settings, not this repository, so it can hit a different team. Tell the user in one line that this repository's Hamster team (`<slug>`) isn't available to this MCP sign-in, and to run `hamster init --force` in the repository or sign in to Hamster MCP as the right user. Then stop.
 
 The selection is saved per user, not per session or client, so switching here also changes the team the user's other Hamster MCP clients use until they switch again.
