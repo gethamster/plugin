@@ -39,8 +39,6 @@ printf 'ACCOUNT_RESOLVED: %s\n' "$account"
 
 Remember the literal `ACCOUNT_RESOLVED` value as the filesystem `$account`. Each Bash call is a fresh shell: assign that value again, shell-quoted, before the calling skill's setup and every selection/scheduling block below. Do not re-derive it from `HAMSTER_ACCOUNT_ID`.
 
-If this client has Hamster MCP tools, read `references/mcp-account.md` from this skill directory and switch MCP to `$account` before any Hamster MCP call.
-
 ---
 
 ## Brief Selection

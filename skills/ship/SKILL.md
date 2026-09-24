@@ -33,7 +33,7 @@ If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`
 
 ## Setup
 
-Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Before any Hamster MCP call, `switch_account` to the resolved slug. If that fails, make no more Hamster MCP calls; stop with the guidance in [mcp-account](references/mcp-account.md). Then run prerequisites and live sync in ONE bash call, assigning `account` to the resolved filesystem slug (shell-quoted), not `HAMSTER_ACCOUNT_ID`:
+Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Then run prerequisites and live sync in ONE bash call, assigning `account` to the resolved filesystem slug (shell-quoted), not `HAMSTER_ACCOUNT_ID`:
 
 ```bash
 export PATH="$HOME/.hamster/bin:$PATH"
@@ -66,7 +66,7 @@ else hamster sync --watch > /dev/null 2>&1 & echo "PREREQ_OK account=${account} 
 
 ## Brief Selection and Scheduling
 
-Follow **Brief Selection** and **Scheduling** in [brief-selection](references/brief-selection.md), ending with its single execute/modify/cancel confirmation.
+Follow **Brief Selection** and **Scheduling** in [brief-selection](references/brief-selection.md): argument parsing, the brief picker, the inline frontmatter parse, and wave grouping, ending with the single execute/modify/cancel confirmation.
 
 ---
 

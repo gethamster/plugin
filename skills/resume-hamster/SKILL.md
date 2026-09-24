@@ -31,7 +31,7 @@ If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`
 
 ## Detect the Brief
 
-Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Before any Hamster MCP call, `switch_account` to the resolved slug. If that fails, make no more Hamster MCP calls; stop with the guidance in [mcp-account](references/mcp-account.md). Then use the resolved filesystem slug (shell-quoted) in one bash call for live sync and all three detection signals:
+Read [brief-selection](references/brief-selection.md) and run **Account Resolution** first. On `ACCOUNT_UNRESOLVED`, follow its team-selection/re-sync guidance and stop. Then use the resolved filesystem slug (shell-quoted) in one bash call for live sync and all three detection signals:
 
 ```bash
 account="<resolved filesystem account slug>"
