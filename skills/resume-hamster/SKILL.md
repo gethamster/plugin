@@ -71,8 +71,8 @@ Resolution order:
 Read [brief-selection](references/brief-selection.md) and run its **Scheduling** step (the inline frontmatter parse + wave grouping). Then overlay git state in one call:
 
 ```bash
-# Committed parents
-git log --oneline | grep -oE 'feat\(ham-[0-9]+\)' | grep -oE '[0-9]+' | sort -un | sed 's/^/HAM-/'
+# Committed parents, as display IDs (HAM-42, ACME-7)
+git log --format=%s | grep -oE '^feat\([a-z][a-z0-9]*-[0-9]+\)' | sed -E 's/^feat\((.*)\)$/\1/' | tr a-z A-Z | sort -u
 # Uncommitted in-flight work
 git status --porcelain
 ```

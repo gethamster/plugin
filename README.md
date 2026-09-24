@@ -217,9 +217,9 @@ Post-wave (orchestrator):
 ### Git conventions
 
 - **Branch**: `feature/{key}-{lowest-id}-{brief-slug}`, where `{key}` is the task display ID's key, lowercased (`HAM-42` → `feature/ham-42-…`, `ACME-7` → `feature/acme-7-…`)
-- **Parent task commits**: `feat(ham-123): concise description` (split by concern for bisectability)
-- **Simplification commits**: `refactor(ham-123): simplify description`
-- **Review fix commits**: `fix(ham-123): address review findings`
+- **Parent task commits**: `feat({key}-123): concise description` (split by concern for bisectability)
+- **Simplification commits**: `refactor({key}-123): simplify description`
+- **Review fix commits**: `fix({key}-123): address review findings`
 - **QA fix commits**: `fix(qa): test-file — description`
 - **PR**: Created on request (not auto-created), targets detected default branch
 
