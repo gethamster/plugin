@@ -2,7 +2,7 @@
 
 **Install Hamster.** One plugin. Talk through hosted MCP or the CLI. Keep the plan on disk, then ship from it.
 
-This is the Hamster product: Agent Plugins skills on every supported client, hosted MCP on every client that installs from GitHub or a marketplace, plus generated native execution workers on Claude Code where that client registers them. The CLI is how the plan stays in this repo. It is not a second install.
+This is the Hamster product: Agent Plugins skills on every supported client, hosted MCP on every client that supports MCP and installs from GitHub or a marketplace, plus generated native execution workers on Claude Code and GitHub Copilot CLI, where those clients register them. The CLI is how the plan stays in this repo. It is not a second install.
 
 ## Install
 
@@ -20,7 +20,7 @@ On Enterprise, an admin must allow marketplace imports. Once Hamster is on the C
 /add-plugin hamster
 ```
 
-Grok Bot is not a separate Hamster package. It uses the same Cursor account and plugin library, so the Cursor install above is the Grok Bot install. Do not run `/add-plugin` in the Grok Bot chat.
+Grok Bot is not a separate Hamster package. It uses the same Cursor account and plugin library, so the Cursor install above is the Grok Bot install. Do not run `/add-plugin` in the Grok Bot chat. If Grok Bot shows "Complete GitHub auth to sync installed plugins", finish GitHub auth from Marketplace → Your plugins.
 
 ### Claude Code
 
@@ -64,6 +64,35 @@ agy plugin install https://github.com/gethamster/plugin
 ```
 
 In the Antigravity app (2.15 or newer), authenticate `hamster_hamster` under Settings → Customizations → Installed MCP Servers. The plugin registers that server itself, so a manual `hamster` entry in `mcp_config.json` would add a second copy of every tool.
+
+Using GitHub Copilot CLI, Grok Build, or Pi? See [More install options](#more-install-options).
+
+## More install options
+
+### GitHub Copilot CLI
+
+```text
+copilot plugin marketplace add gethamster/plugin
+copilot plugin install hamster@hamster-plugins
+```
+
+Copilot CLI lists the skills as `/hamster:<skill>`. To sign in to the hosted MCP server, run `/mcp show hamster`.
+
+### Grok Build CLI (`grok`)
+
+```text
+grok plugin install gethamster/plugin --trust
+```
+
+Grok lists the skills as `/<skill>`. To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`. Install from the repository as shown: Grok's marketplace route can't find `hamster@hamster-plugins`.
+
+### Pi
+
+```text
+pi install git:github.com/gethamster/plugin
+```
+
+Pi lists the skills as `/skill:<skill>`. Pi has no MCP support, so Hamster runs through the CLI: run `/skill:setup` to install it and sign in, or follow [Advanced: CLI binary](#advanced-cli-binary).
 
 ## After install
 
@@ -184,7 +213,7 @@ Produces: metrics table, hourly distribution, session analysis, hotspots, PR siz
 | **task-executor** | Senior Engineer | Implements one parent task + subtasks; loads project skills, blueprints, and methods |
 | **wave-reviewer** | Staff Engineer | Reviews a whole wave's diff (per-parent verdicts + cross-parent integration checks), then simplifies |
 
-Canonical worker protocols live in `skills/ship/references/agents/`. Root `agents/task-executor.md` and `agents/wave-reviewer.md` are generated Claude Code native adapters (registration + model metadata) over those bodies — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code does), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
+Canonical worker protocols live in `skills/ship/references/agents/`. Root `agents/task-executor.md` and `agents/wave-reviewer.md` are generated Claude Code native adapters (registration + model metadata) over those bodies — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. `com.github.copilot/agents` is a symlink to `agents/`, because GitHub Copilot CLI reads plugin agents only from there. Ship prefers the registered native agent when the client exposes it (Claude Code and Copilot CLI do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
 
 Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`); it is not part of the installed skill surface.
 
