@@ -30,11 +30,13 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 
 ## Install the CLI
 
-If `hamster` is not on PATH (also look in `~/.hamster/bin`):
+If `hamster` is not on PATH (also look in `~/.hamster/bin`), run the bundled installer, with `SKILL_DIR` set as above:
 
 ```bash
-curl -fsSL https://tryhamster.com/cli/install | bash
+SKILL_DIR="<absolute path of the directory containing this SKILL.md>"; bash "$SKILL_DIR/scripts/install-hamster-cli.sh"
 ```
+
+It downloads the latest `hamster` release for this OS and architecture from GitHub, refuses to install unless the archive matches its published SHA256, installs to `~/.hamster/bin`, and adds that directory to PATH in `~/.zshrc` and `~/.bashrc`. If the script is not readable, or this is Windows, ask the user to download the binary for their platform from https://github.com/gethamster/plugin/releases/latest into `~/.hamster/bin`, then continue.
 
 Then put `~/.hamster/bin` on PATH for this session.
 
