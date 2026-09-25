@@ -680,6 +680,10 @@ test("the CLI installer verifies, installs, and edits shell and CLI config once"
     const result = await invoke();
     assert.equal(result.code, 0, result.stderr);
     assert.match(result.stdout, /Checksum verified/);
+    if (attempt === 0) {
+      // SHELL is bash here, so the hint names the file bash reads.
+      assert.match(result.stdout, /Restart your shell \(or run: source .*\/\.bashrc\)/);
+    }
   }
 
   assert.equal(await pathExists(binary), true);
