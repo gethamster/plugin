@@ -2,7 +2,9 @@
 
 /**
  * Generate root agents/*.md as Claude Code native-agent projections over the
- * canonical skill-local prompt bodies under skills/ship/references/agents/.
+ * canonical skill-local prompt bodies under skills/ship/references/agents/,
+ * then mirror what Claude Code loads into claude/, the plugin folder submitted
+ * to the Claude plugin directory.
  *
  * Usage:
  *   node scripts/sync-adapters.mjs          # write generated files
@@ -35,6 +37,15 @@ const AGENTS = [
       "Reviews and simplifies the cumulative code changes of one execution wave (one or more parent tasks). Phase 1 reviews the full wave diff for convention compliance, quality, security, and completeness — producing a per-parent PASS or NEEDS_FIXES verdict. Because it sees the whole wave, it also catches cross-parent integration issues that per-task review would miss. For parents that pass, Phase 2 applies surgical simplification while preserving all functionality. Runs once per wave, after all parallel task-executors complete and validation/tests pass.",
   },
 ];
+
+// The Claude plugin directory reads and scans only the submitted plugin folder,
+// and skips symbolic links, so claude/ holds regular-file copies of exactly what
+// Claude Code loads. The repo's maintainer scripts, CI, listing images, and other
+// clients' manifests stay out of it. The root keeps the source of truth.
+const CLAUDE_PACKAGE_DIR = "claude";
+const CLAUDE_PACKAGE_SOURCES = [".claude-plugin/plugin.json", ".mcp.json", "LICENSE", "agents", "skills"];
+// Written for the directory listing, not copied from the root.
+const CLAUDE_PACKAGE_OWN_FILES = new Set(["README.md"]);
 
 function renderAgent({ id, model, color, description }, body) {
   const normalizedBody = body.replace(/\r\n/g, "\n").replace(/\s+$/g, "") + "\n";
@@ -122,12 +133,166 @@ export async function syncAdapters({ check = false } = {}) {
     written.push(path.relative(repoRoot, targetPath));
   }
 
-  return { errors, written };
+  const removed = [];
+  await syncClaudePackage({ check, errors, written, removed });
+  return { errors, written, removed };
+}
+
+// A symbolic link is listed as one entry and never followed; `links` collects it.
+async function listFiles(relativePath, links = []) {
+  const absolutePath = path.join(repoRoot, relativePath);
+  let stat;
+  try {
+    stat = await fs.lstat(absolutePath);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+  if (stat.isSymbolicLink()) {
+    links.push(relativePath);
+  }
+  if (!stat.isDirectory()) {
+    return [relativePath];
+  }
+  const files = [];
+  for (const entry of await fs.readdir(absolutePath)) {
+    files.push(...(await listFiles(path.join(relativePath, entry), links)));
+  }
+  return files;
+}
+
+// Root agents/*.md are themselves generated from the skill-local bodies, so a
+// drift there is fixed in the body (or the AGENTS entry above for frontmatter).
+function editSource(file) {
+  const agent = AGENTS.find(({ id }) => file === path.join("agents", `${id}.md`));
+  if (!agent) {
+    return file;
+  }
+  return `${path.join("skills", "ship", "references", "agents", `${agent.id}.md`)} (or its AGENTS entry in scripts/sync-adapters.mjs)`;
+}
+
+async function syncClaudePackage({ check, errors, written, removed }) {
+  // Each root file lands at the same relative path inside claude/.
+  const expected = new Set();
+  for (const source of CLAUDE_PACKAGE_SOURCES) {
+    const files = await listFiles(source);
+    if (files.length === 0) {
+      errors.push(`Claude package source is missing: ${source}.`);
+    }
+    for (const file of files) {
+      expected.add(file);
+    }
+  }
+
+  // The Claude plugin directory skips symbolic links, so a link here would be
+  // a file missing from the package even though it reads the same as its
+  // source. Links are never read through. Every link except README.md leaves
+  // `present`; README.md stays so it isn't also reported missing.
+  const links = [];
+  const present = new Set(
+    (await listFiles(CLAUDE_PACKAGE_DIR, links)).map((file) => path.relative(CLAUDE_PACKAGE_DIR, file))
+  );
+  const rerun = "Run `node scripts/sync-adapters.mjs`.";
+  const replacedLinks = new Set();
+
+  for (const link of links) {
+    const file = path.relative(CLAUDE_PACKAGE_DIR, link);
+    if (CLAUDE_PACKAGE_OWN_FILES.has(file)) {
+      // Written by hand, so the sync can't regenerate it; never delete it.
+      errors.push(`${link} is a symbolic link; replace it with a regular file. It is written by hand, not generated.`);
+      continue;
+    }
+    present.delete(file);
+    if (check) {
+      errors.push(`${link} is a symbolic link; claude/ must hold regular files. ${rerun}`);
+      continue;
+    }
+    await fs.rm(path.join(repoRoot, link));
+    if (expected.has(file)) {
+      replacedLinks.add(link);
+    } else {
+      removed.push(link);
+    }
+  }
+
+  for (const own of CLAUDE_PACKAGE_OWN_FILES) {
+    if (!present.has(own)) {
+      errors.push(`${path.join(CLAUDE_PACKAGE_DIR, own)} is missing; it is written by hand, not generated.`);
+    }
+  }
+
+  for (const file of present) {
+    if (expected.has(file) || CLAUDE_PACKAGE_OWN_FILES.has(file)) {
+      continue;
+    }
+    const target = path.join(CLAUDE_PACKAGE_DIR, file);
+    if (check) {
+      errors.push(`${target} has no source at the repository root. Add it at the root instead, then ${rerun.toLowerCase()}`);
+    } else {
+      await fs.rm(path.join(repoRoot, target));
+      removed.push(target);
+    }
+  }
+
+  for (const file of expected) {
+    const target = path.join(CLAUDE_PACKAGE_DIR, file);
+    const sourcePath = path.join(repoRoot, file);
+    const targetPath = path.join(repoRoot, target);
+    let sourceBytes;
+    let sourceMode;
+    try {
+      sourceBytes = await fs.readFile(sourcePath);
+      // The installer and the ensure-ready scripts must stay executable.
+      sourceMode = (await fs.stat(sourcePath)).mode & 0o777;
+    } catch (error) {
+      if (error.code === "EISDIR") {
+        errors.push(`${file} is a symbolic link to a directory; claude/ copies regular files only. Replace the link with the files.`);
+      } else if (error.code === "ENOENT") {
+        errors.push(`${file} is a symbolic link whose target is missing.`);
+      } else {
+        errors.push(`Could not read ${file}: ${error.message}`);
+      }
+      continue;
+    }
+    let difference = "missing";
+    if (present.has(file)) {
+      const sameBytes = sourceBytes.equals(await fs.readFile(targetPath));
+      const sameExec = ((await fs.stat(targetPath)).mode & 0o111) === (sourceMode & 0o111);
+      if (sameBytes && sameExec) {
+        continue;
+      }
+      difference = sameBytes ? "executable bit" : "content";
+    }
+    if (check) {
+      if (difference === "missing") {
+        errors.push(`${target} is missing. ${rerun}`);
+      } else {
+        errors.push(
+          `${target} differs from ${file} (${difference}). claude/ is generated: make the change in ${editSource(file)}, then ${rerun.toLowerCase()} A sync overwrites edits made only in claude/.`
+        );
+      }
+      continue;
+    }
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.copyFile(sourcePath, targetPath);
+    await fs.chmod(targetPath, sourceMode);
+    written.push(replacedLinks.has(target) ? `${target} (replaced a symbolic link)` : target);
+  }
 }
 
 async function main() {
   const check = process.argv.includes("--check");
-  const { errors, written } = await syncAdapters({ check });
+  const { errors, written, removed } = await syncAdapters({ check });
+
+  // Report what a sync already changed even when it then fails.
+  for (const file of written) {
+    console.log(`Wrote ${file}`);
+  }
+  for (const file of removed) {
+    console.log(`Removed ${file}`);
+  }
 
   if (errors.length > 0) {
     console.error(check ? "Adapter check failed:" : "Adapter sync failed:");
@@ -139,11 +304,6 @@ async function main() {
 
   if (check) {
     console.log("Adapter check passed.");
-    return;
-  }
-
-  for (const file of written) {
-    console.log(`Wrote ${file}`);
   }
 }
 

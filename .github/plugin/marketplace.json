@@ -1,0 +1,18 @@
+{
+  "name": "hamster-plugins",
+  "metadata": {
+    "description": "GitHub Copilot CLI plugins for Hamster Studio"
+  },
+  "owner": {
+    "name": "Hamster",
+    "email": "hello@tryhamster.com"
+  },
+  "plugins": [
+    {
+      "name": "hamster",
+      "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes",
+      "version": "3.4.4",
+      "source": "./"
+    }
+  ]
+}

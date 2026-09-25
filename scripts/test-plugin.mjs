@@ -3,16 +3,21 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const validatorPath = path.join(repoRoot, "scripts", "validate-plugin.mjs");
-const bundleBuilderPath = path.join(repoRoot, "scripts", "build-codex-skills-bundle.mjs");
-const readyScript = path.join(repoRoot, "skills", "setup", "scripts", "ensure-ready.sh");
+// Scripts are spawned by these fixed relative paths from a known cwd (a
+// fixture copy, or the checkout for the setup scripts), never by an absolute
+// path built from where the checkout happens to live.
+const VALIDATOR = "scripts/validate-plugin.mjs";
+const BUNDLE_BUILDER = "scripts/build-codex-skills-bundle.mjs";
+const SYNC_ADAPTERS = "scripts/sync-adapters.mjs";
+const READY_SCRIPT = "skills/setup/scripts/ensure-ready.sh";
+const INSTALLER_SCRIPT = "skills/setup/scripts/install-hamster-cli.sh";
 
 const PACKAGE_ENTRIES = [
   "plugin.json",
@@ -28,6 +33,8 @@ const PACKAGE_ENTRIES = [
   "agents",
   "assets",
   "scripts",
+  "claude",
+  ".github/plugin",
 ];
 
 const fixtures = [];
@@ -42,10 +49,14 @@ async function makeTemp(prefix) {
   return dir;
 }
 
-function run(command, args, options) {
+// Only cwd and env are passed through, and never through a shell, so no path
+// or environment value in a fixture is interpreted as shell syntax.
+function run(command, args, { cwd, env } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      ...options,
+      cwd,
+      env,
+      shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -71,7 +82,7 @@ async function copyPackage(dest) {
 }
 
 async function runValidator(cwd) {
-  return run(process.execPath, [validatorPath], { cwd });
+  return run(process.execPath, [VALIDATOR], { cwd });
 }
 
 async function patchCodexManifest(cwd, patch) {
@@ -115,7 +126,7 @@ async function pathExists(target) {
 
 async function buildCodexBundle(cwd, args = []) {
   const outDir = path.join(cwd, "dist");
-  const result = await run(process.execPath, [bundleBuilderPath, "--out", outDir, ...args], { cwd });
+  const result = await run(process.execPath, [BUNDLE_BUILDER, "--out", outDir, ...args], { cwd });
   const version = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
   return { result, zipPath: path.join(outDir, `hamster-codex-skills-only-${version}.zip`) };
 }
@@ -160,6 +171,145 @@ test("a non-semver root version fails validation", async () => {
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Root plugin\.json "version" must be semver-like, got "3\.4"/);
+});
+
+test("a skill edit not synced into claude/ fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-drift-");
+  await copyPackage(cwd);
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
+  await writeFile(path.join(cwd, "claude", "skills", "qa", "notes.md"), "Only in claude/.\n");
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(
+    result.stderr,
+    /claude\/skills\/qa\/SKILL\.md differs from skills\/qa\/SKILL\.md \(content\)\. claude\/ is generated: make the change in skills\/qa\/SKILL\.md/
+  );
+  assert.match(result.stderr, /claude\/skills\/qa\/notes\.md has no source at the repository root/);
+});
+
+test("symlinks inside claude/ fail validation, dangling or not, and are never followed", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-link-");
+  await copyPackage(cwd);
+  await unlink(path.join(cwd, "claude", ".mcp.json"));
+  await symlink("../.mcp.json", path.join(cwd, "claude", ".mcp.json"));
+  await unlink(path.join(cwd, "claude", "LICENSE"));
+  await symlink("../NOPE", path.join(cwd, "claude", "LICENSE"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /claude\/\.mcp\.json is a symbolic link; claude\/ must hold regular files/);
+  assert.match(result.stderr, /claude\/LICENSE is a symbolic link; claude\/ must hold regular files/);
+  assert.doesNotMatch(result.stderr, /ENOENT/);
+});
+
+test("a drift in a generated agent names the skill-local body to edit", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-agent-");
+  await copyPackage(cwd);
+  const agentPath = path.join(cwd, "claude", "agents", "task-executor.md");
+  await writeFile(agentPath, `${await readFile(agentPath, "utf8")}\nEdited in claude/ only.\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /make the change in skills\/ship\/references\/agents\/task-executor\.md/);
+});
+
+test("a symlinked directory under a root source is named, not a bare EISDIR", async () => {
+  const cwd = await makeTemp("hamster-plugin-source-link-");
+  await copyPackage(cwd);
+  await symlink("../qa", path.join(cwd, "skills", "setup", "qa-link"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /skills\/setup\/qa-link is a symbolic link to a directory/);
+});
+
+test("a dangling symlink under a root source is named, not a bare ENOENT", async () => {
+  const cwd = await makeTemp("hamster-plugin-source-dangle-");
+  await copyPackage(cwd);
+  await symlink("../nope.md", path.join(cwd, "skills", "setup", "dangle.md"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /skills\/setup\/dangle\.md is a symbolic link whose target is missing/);
+});
+
+test("a claude/ copy that loses its executable bit fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-mode-");
+  await copyPackage(cwd);
+  await chmod(path.join(cwd, "claude", "skills", "setup", "scripts", "install-hamster-cli.sh"), 0o644);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(
+    result.stderr,
+    /claude\/skills\/setup\/scripts\/install-hamster-cli\.sh differs from skills\/setup\/scripts\/install-hamster-cli\.sh \(executable bit\)/
+  );
+});
+
+test("syncing never deletes a symlinked claude/README.md, which it cannot regenerate", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-readme-link-");
+  await copyPackage(cwd);
+  await unlink(path.join(cwd, "claude", "README.md"));
+  await symlink("../README.md", path.join(cwd, "claude", "README.md"));
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
+
+  const sync = await run(process.execPath, [SYNC_ADAPTERS], { cwd });
+  assert.equal(sync.code, 1);
+  assert.match(sync.stderr, /claude\/README\.md is a symbolic link; replace it with a regular file/);
+  assert.equal((await lstat(path.join(cwd, "claude", "README.md"))).isSymbolicLink(), true);
+  // What the sync already changed is reported even though it then fails.
+  assert.match(sync.stdout, /Wrote claude\/skills\/qa\/SKILL\.md/);
+});
+
+test("syncing claude/ copies edits, drops orphans and links, and keeps its README", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-sync-");
+  await copyPackage(cwd);
+  const readmePath = path.join(cwd, "claude", "README.md");
+  const readme = await readFile(readmePath);
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
+  await writeFile(path.join(cwd, "claude", "skills", "qa", "notes.md"), "Only in claude/.\n");
+  await unlink(path.join(cwd, "claude", "LICENSE"));
+  await symlink("../LICENSE", path.join(cwd, "claude", "LICENSE"));
+
+  const sync = await run(process.execPath, [SYNC_ADAPTERS], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.deepEqual(await readFile(readmePath), readme);
+  assert.deepEqual(await readFile(path.join(cwd, "claude", "skills", "qa", "SKILL.md")), await readFile(skillPath));
+  assert.equal(await pathExists(path.join(cwd, "claude", "skills", "qa", "notes.md")), false);
+  assert.equal((await lstat(path.join(cwd, "claude", "LICENSE"))).isFile(), true);
+
+  const check = await run(process.execPath, [SYNC_ADAPTERS, "--check"], { cwd });
+  assert.equal(check.code, 0, check.stderr);
+});
+
+test("a Claude marketplace that installs from the repository root fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-source-");
+  await copyPackage(cwd);
+  const marketplacePath = path.join(cwd, ".claude-plugin", "marketplace.json");
+  const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+  marketplace.plugins[0].source = "./";
+  await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Claude marketplace\.json plugins\[0\]\.source must be "\.\/claude"/);
+});
+
+test("a Copilot marketplace version that drifts fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-copilot-version-");
+  await copyPackage(cwd);
+  const marketplacePath = path.join(cwd, ".github", "plugin", "marketplace.json");
+  const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+  marketplace.plugins[0].version = "0.0.1";
+  await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Copilot marketplace\.json plugins\[0\] version "0\.0\.1" does not match root/);
 });
 
 test("a missing referenced path fails validation", async () => {
@@ -350,12 +500,12 @@ test("archive bytes follow the checkout, not the machine building it", async () 
   // A reviewer rebuilding the branch to compare hashes runs under their own
   // umask and timezone, and zip records both unless the build pins them.
   const digests = [];
-  for (const shell of ["umask 022; TZ=UTC", "umask 002; TZ=Asia/Tokyo"]) {
-    const result = await run(
-      "sh",
-      ["-c", `${shell}; "${process.execPath}" "${bundleBuilderPath}" --out dist`],
-      { cwd }
-    );
+  for (const [umask, tz] of [[0o022, "UTC"], [0o002, "Asia/Tokyo"]]) {
+    // A child inherits the umask in force when it is spawned.
+    const previous = process.umask(umask);
+    const pending = run(process.execPath, [BUNDLE_BUILDER, "--out", "dist"], { cwd, env: { ...process.env, TZ: tz } });
+    process.umask(previous);
+    const result = await pending;
     assert.equal(result.code, 0, result.stderr);
     const version = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
     const zipPath = path.join(cwd, "dist", `hamster-codex-skills-only-${version}.zip`);
@@ -369,8 +519,11 @@ test("an uncommitted bundle source stops the build", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-dirty-");
   await copyPackage(cwd);
   await commitPackage(cwd);
-  const skillPath = path.join(cwd, "skills", "ship", "SKILL.md");
-  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+  // Edit the claude/ mirror too, so validation passes and the dirty-tree gate is what stops the build.
+  for (const root of [cwd, path.join(cwd, "claude")]) {
+    const skillPath = path.join(root, "skills", "ship", "SKILL.md");
+    await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+  }
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
@@ -397,7 +550,8 @@ exit 0
   );
   await chmod(hamster, 0o755);
 
-  const result = await run("bash", [readyScript], {
+  const result = await run("bash", [READY_SCRIPT], {
+    cwd: repoRoot,
     env: {
       ...process.env,
       HOME: home,
@@ -408,4 +562,298 @@ exit 0
   assert.equal(result.code, 1);
   assert.equal(result.stdout.trim(), "SETUP_NEEDED");
   assert.match(result.stderr, /status failed: not logged in/);
+});
+
+// Runs the real installer against a fake release: a stub `curl` serves a
+// tarball and its checksum from `release/`, and a stub `rm` refuses the
+// legacy /usr/local/bin/hamster path so a test can never delete a real binary.
+async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true, extraEnv = {} } = {}) {
+  const root = await makeTemp("hamster-installer-");
+  const home = path.join(root, "home");
+  const stubs = path.join(root, "stubs");
+  const release = path.join(root, "release");
+  await mkdir(home, { recursive: true });
+  await mkdir(stubs, { recursive: true });
+  await mkdir(path.join(release, "pkg"), { recursive: true });
+
+  await writeFile(path.join(release, "pkg", "hamster"), `#!/usr/bin/env bash\n${binary}\n`);
+  await chmod(path.join(release, "pkg", "hamster"), 0o755);
+  const tar = await run("tar", ["-czf", path.join(release, "archive.tar.gz"), "-C", path.join(release, "pkg"), "hamster"]);
+  assert.equal(tar.code, 0, tar.stderr);
+  const digest = createHash("sha256").update(await readFile(path.join(release, "archive.tar.gz"))).digest("hex");
+  if (checksum === "match") {
+    await writeFile(path.join(release, "archive.sha256"), `${digest}  archive.tar.gz\n`);
+  } else if (checksum === "wrong") {
+    await writeFile(path.join(release, "archive.sha256"), `${"0".repeat(64)}  archive.tar.gz\n`);
+  } else if (checksum === "empty") {
+    await writeFile(path.join(release, "archive.sha256"), "");
+  }
+  if (!archive) {
+    await unlink(path.join(release, "archive.tar.gz"));
+  }
+
+  await writeFile(
+    path.join(stubs, "curl"),
+    `#!/usr/bin/env bash
+url=""; out=""
+while [ $# -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac
+done
+case "$url" in
+  *.sha256) src="${release}/archive.sha256" ;;
+  *) src="${release}/archive.tar.gz" ;;
+esac
+echo "$url" >>"${release}/requested"
+[ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
+cp "$src" "$out"
+`
+  );
+  await writeFile(
+    path.join(stubs, "rm"),
+    `#!/usr/bin/env bash
+for arg in "$@"; do [ "$arg" = /usr/local/bin/hamster ] && exit 1; done
+exec /bin/rm "$@"
+`
+  );
+  await chmod(path.join(stubs, "curl"), 0o755);
+  await chmod(path.join(stubs, "rm"), 0o755);
+
+  await writeFile(path.join(home, ".bashrc"), rc);
+  const configPath = path.join(home, ".hamster", "config.yaml");
+  if (config !== null) {
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, config.text);
+    await chmod(configPath, config.mode ?? 0o644);
+  }
+
+  const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${stubs}${path.delimiter}${process.env.PATH ?? ""}` };
+  // Clear the overrides so a runner's own VERSION or HAMSTER_* never leaks in.
+  for (const name of ["VERSION", "HAMSTER_VERSION", "HAMSTER_INSTALL_DIR", "HAMSTER_URL"]) {
+    delete env[name];
+  }
+  Object.assign(env, extraEnv);
+  const invoke = (more = {}) => run("bash", [INSTALLER_SCRIPT], { cwd: repoRoot, env: { ...env, ...more } });
+  const requested = async () => (await readFile(path.join(release, "requested"), "utf8")).trim().split("\n");
+  return { home, configPath, invoke, requested, binary: path.join(home, ".hamster", "bin", "hamster") };
+}
+
+for (const checksum of ["wrong", "empty", "missing"]) {
+  test(`the CLI installer refuses a ${checksum} checksum and installs nothing`, async () => {
+    const { invoke, binary } = await runInstaller({ checksum });
+    const result = await invoke();
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, checksum === "missing" ? /Failed to download the checksum/ : /Checksum mismatch/);
+    assert.match(result.stderr, /Install it by hand instead/);
+    assert.equal(await pathExists(binary), false);
+  });
+}
+
+test("a failed download ends with the manual install steps", async () => {
+  const { invoke, binary } = await runInstaller({ archive: false });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Failed to download .*Install it by hand instead: download hamster-.*\.tar\.gz and hamster-.*\.tar\.gz\.sha256 from https:\/\/github\.com\/gethamster\/plugin\/releases\/latest/);
+  assert.equal(await pathExists(binary), false);
+});
+
+test("a binary that dies silently is reported with its exit status or signal", async () => {
+  for (const [script, expected] of [
+    ["exit 3", /failed to run \(exit status 3\)$/m],
+    ["kill -9 $$", /failed to run \(killed by signal 9\)$/m],
+    ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
+    ["echo 'bad cpu type'; exit 1", /failed to run \(exit status 1\): bad cpu type$/m],
+  ]) {
+    const { invoke } = await runInstaller({ binary: script });
+    const result = await invoke();
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, expected);
+  }
+});
+
+test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {
+  const { home, configPath, invoke, binary } = await runInstaller({
+    config: { text: "profile: work\napi_url: http://old.example\n" },
+    rc: "if true; then\n  alias hamster='task-master'\nfi\n",
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await invoke();
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Checksum verified/);
+    if (attempt === 0) {
+      // SHELL is bash here, so the hint names the file bash reads.
+      assert.match(result.stdout, /Restart your shell \(or run: source .*\/\.bashrc\)/);
+    }
+  }
+
+  assert.equal(await pathExists(binary), true);
+  assert.equal(await readFile(configPath, "utf8"), 'profile: work\napi_url: "https://tryhamster.com"\n');
+  const bashrc = await readFile(path.join(home, ".bashrc"), "utf8");
+  assert.match(bashrc, /^ {2}# alias hamster='task-master'/m);
+  assert.doesNotMatch(bashrc, /^\s*alias hamster='task-master'/m);
+  assert.equal(bashrc.match(/\.hamster\/bin:\$PATH/g)?.length, 1);
+  assert.equal(bashrc.match(/^alias ham='hamster'$/gm)?.length, 1);
+});
+
+test("the CLI installer says so when it cannot write config.yaml", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only directory");
+    return;
+  }
+  const { home, invoke, binary } = await runInstaller();
+  const hamsterDir = path.join(home, ".hamster");
+  await mkdir(path.join(hamsterDir, "bin"), { recursive: true });
+  await chmod(hamsterDir, 0o555);
+  const result = await invoke();
+  await chmod(hamsterDir, 0o755);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /\[ERROR\] Could not write .*config\.yaml \(the reason is above\), so the CLI is installed but not pointed at Hamster/);
+  assert.equal(await pathExists(binary), true);
+});
+
+test("the CLI installer honors HAMSTER_VERSION, HAMSTER_INSTALL_DIR and HAMSTER_URL", async () => {
+  const { home, configPath, invoke, requested } = await runInstaller({
+    extraEnv: { HAMSTER_VERSION: "v1.2.3", HAMSTER_URL: "https://staging.example.com" },
+  });
+  const customDir = path.join(home, "tools", "bin");
+  const result = await invoke({ HAMSTER_INSTALL_DIR: customDir });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(await pathExists(path.join(customDir, "hamster")), true);
+  const urls = await requested();
+  assert.equal(urls.length, 2);
+  for (const url of urls) {
+    assert.match(url, /^https:\/\/github\.com\/gethamster\/plugin\/releases\/download\/v1\.2\.3\/hamster-/);
+  }
+  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://staging.example.com"\n');
+  assert.match(result.stderr, /Custom install dir: make sure .* is on your PATH/);
+  assert.doesNotMatch(await readFile(path.join(home, ".bashrc"), "utf8"), /\.hamster\/bin/);
+});
+
+test("the CLI installer reads the older VERSION variable too", async () => {
+  const { invoke, requested } = await runInstaller({ extraEnv: { VERSION: "v0.9.0" } });
+  const result = await invoke();
+  assert.equal(result.code, 0, result.stderr);
+  assert.match((await requested())[0], /\/releases\/download\/v0\.9\.0\//);
+});
+
+test("HAMSTER_VERSION wins over VERSION, and a failed pinned download names that release", async () => {
+  const { invoke, requested } = await runInstaller({
+    archive: false,
+    extraEnv: { HAMSTER_VERSION: "v1.2.3", VERSION: "v0.9.0" },
+  });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match((await requested())[0], /\/releases\/download\/v1\.2\.3\//);
+  assert.match(result.stdout, /Installing release v1\.2\.3, set by HAMSTER_VERSION/);
+  assert.match(result.stderr, /If release v1\.2\.3 doesn't exist, fix or unset HAMSTER_VERSION/);
+  assert.match(result.stderr, /from https:\/\/github\.com\/gethamster\/plugin\/releases,/);
+});
+
+test("the CLI installer rejects a HAMSTER_URL that isn't http(s) or has no host", async () => {
+  for (const value of ["ftp://example.com", "https://"]) {
+    const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: value } });
+    const result = await invoke();
+    assert.equal(result.code, 1, value);
+    assert.match(result.stderr, /HAMSTER_URL must be an http:\/\/ or https:\/\/ URL with a host/);
+    assert.equal(await pathExists(binary), false);
+  }
+});
+
+test("the CLI installer says so when HAMSTER_INSTALL_DIR can't be written", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only directory");
+    return;
+  }
+  const { home, invoke } = await runInstaller();
+  const lockedDir = path.join(home, "locked");
+  await mkdir(lockedDir, { recursive: true });
+  await chmod(lockedDir, 0o555);
+  const result = await invoke({ HAMSTER_INSTALL_DIR: lockedDir });
+  await chmod(lockedDir, 0o755);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Permission denied[\s\S]*\[ERROR\] Could not write to .*locked \(the reason is above\)\..* set HAMSTER_INSTALL_DIR/);
+});
+
+test("a read-only shell rc file is a warning, and the install still finishes", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only file");
+    return;
+  }
+  const { home, configPath, invoke, binary } = await runInstaller();
+  const bashrc = path.join(home, ".bashrc");
+  await chmod(bashrc, 0o444);
+  // .zshrc takes the PATH line, but bash, the login shell, reads .bashrc.
+  await writeFile(path.join(home, ".zshrc"), "");
+  const result = await invoke();
+  await chmod(bashrc, 0o644);
+  assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
+  assert.doesNotMatch(result.stdout, /Restart your shell/);
+  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add alias ham='hamster' to it by hand/);
+  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
+  assert.equal(await pathExists(binary), true);
+  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
+});
+
+test("an rc file the user can't touch, like a home-manager symlink, doesn't stop the install", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only file");
+    return;
+  }
+  const { home, configPath, invoke, binary } = await runInstaller();
+  const bashrc = path.join(home, ".bashrc");
+  // A file owned by root stands in for a symlink into a read-only store such
+  // as the nix store: a non-root user can neither write nor touch it. (Root is
+  // skipped above, so this never writes to it.)
+  await unlink(bashrc);
+  await symlink("/etc/shells", bashrc);
+  const result = await invoke();
+  assert.equal(result.code, 0, result.stderr);
+  // The file exists, so it isn't touched, and bash reads it.
+  assert.doesNotMatch(result.stderr, /Could not create/);
+  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
+  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
+  assert.equal(await pathExists(binary), true);
+  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
+});
+
+test("a config.yaml the installer can't write names the reason", async () => {
+  const { configPath, invoke } = await runInstaller();
+  await mkdir(configPath, { recursive: true });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Is a directory[\s\S]*\[ERROR\] Could not write .*config\.yaml \(the reason is above\)/);
+});
+
+test("a login shell other than bash or zsh gets a PATH warning, even with a .bashrc", async () => {
+  const { invoke, binary } = await runInstaller();
+  const result = await invoke({ SHELL: "/usr/bin/fish" });
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /\[WARN\] Your login shell \(\/usr\/bin\/fish\) doesn't read ~\/\.zshrc or ~\/\.bashrc/);
+  assert.doesNotMatch(result.stdout, /Restart your shell/);
+  assert.equal(await pathExists(binary), true);
+
+  const bashResult = await invoke();
+  assert.doesNotMatch(bashResult.stderr, /doesn't read ~\/\.zshrc/);
+});
+
+test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {
+  const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: 'https://x.example.com/"quoted' } });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /HAMSTER_URL must not contain spaces, quotes, or backslashes/);
+  assert.equal(await pathExists(binary), false);
+});
+
+test("the CLI installer stops without touching a config.yaml it cannot read", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can read a mode 000 file");
+    return;
+  }
+  const { configPath, invoke } = await runInstaller({ config: { text: "profile: work\n", mode: 0o000 } });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Could not read .*config\.yaml, so it was left unchanged/);
+  await chmod(configPath, 0o644);
+  assert.equal(await readFile(configPath, "utf8"), "profile: work\n");
 });

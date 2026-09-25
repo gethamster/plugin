@@ -286,13 +286,38 @@ function validateMarketplaceEntry(context, entry, version) {
     addError(`${context} plugins[0].name must be "hamster".`);
     return;
   }
-  if (!isRepoRootSource(entry.source)) {
-    addError(`${context} plugins[0].source must resolve to "./", got ${JSON.stringify(entry.source)}.`);
+  // Claude installs from claude/, the same folder the Claude plugin directory
+  // scans, so a marketplace install and a directory install are one package.
+  if (entry.source !== "./claude") {
+    addError(`${context} plugins[0].source must be "./claude", got ${JSON.stringify(entry.source)}.`);
   }
   if (entry.license !== "MIT") {
     addError(`${context} plugin license must be "MIT".`);
   }
   requireVersionParity(`${context} plugins[0]`, entry.version, version);
+}
+
+// Copilot CLI reads .github/plugin/marketplace.json before
+// .claude-plugin/marketplace.json, so this file keeps Copilot on the repository
+// root, where the Agent Plugins 1.0 plugin.json and com.github.copilot/agents are.
+async function validateCopilot(version) {
+  const marketplacePath = path.join(repoRoot, ".github", "plugin", "marketplace.json");
+  const marketplace = await readJsonFile(marketplacePath, "Copilot marketplace manifest");
+  if (!marketplace) {
+    return;
+  }
+  if (marketplace.name !== "hamster-plugins") {
+    addError('Copilot marketplace.json name must be "hamster-plugins".');
+  }
+  const entry = Array.isArray(marketplace.plugins) ? marketplace.plugins[0] : null;
+  if (!entry || entry.name !== "hamster") {
+    addError('Copilot marketplace.json plugins[0].name must be "hamster".');
+    return;
+  }
+  if (!isRepoRootSource(entry.source)) {
+    addError(`Copilot marketplace.json plugins[0].source must resolve to "./", got ${JSON.stringify(entry.source)}.`);
+  }
+  requireVersionParity("Copilot marketplace.json plugins[0]", entry.version, version);
 }
 
 // cursor/plugins/schemas/marketplace.schema.json is closed at the root (name,
@@ -848,6 +873,7 @@ async function main() {
     const version = rootManifest?.version ?? null;
     await validateCursor(version);
     await validateClaude(version);
+    await validateCopilot(version);
     const codexCategory = await validateCodex(version);
     await validateCodexCatalog(codexCategory);
     await validateNoAntigravityNest();
