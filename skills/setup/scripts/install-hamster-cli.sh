@@ -46,8 +46,8 @@ esac
 
 archive="hamster-${os}-${arch}.tar.gz"
 url="https://github.com/${REPO}/releases/latest/download/${archive}"
-# If a release ever stops matching what this script expects, it ends with the
-# manual steps rather than a dead end.
+# A failed download, a checksum that doesn't match, or an archive laid out
+# differently ends with the manual steps rather than a dead end.
 manual="Install it by hand instead: download ${archive} and ${archive}.sha256 from https://github.com/${REPO}/releases/latest, check that they match, and put the hamster binary from the archive in ${INSTALL_DIR}."
 
 work="$(mktemp -d)"
@@ -65,7 +65,7 @@ else
   fail "No sha256sum or shasum found, so the download cannot be verified."
 fi
 expected="$(awk '{print $1}' "$work/$archive.sha256")"
-[ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "Checksum mismatch: expected ${expected:-nothing}, got $actual"
+[ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "Checksum mismatch: expected ${expected:-nothing}, got $actual. $manual"
 info "Checksum verified"
 
 tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manual"
@@ -104,7 +104,7 @@ update_rc() {
     elif cmp -s "$rc" "$rc.hamster-bak"; then
       warn "Found $stale in $rc but could not comment it out. Remove it by hand."
     else
-      warn "Commented out stale task-master alias in $rc"
+      info "Commented out stale task-master alias in $rc"
     fi
     rm -f "$rc.hamster-bak"
   done

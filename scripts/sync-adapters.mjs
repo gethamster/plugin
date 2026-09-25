@@ -163,6 +163,16 @@ async function listFiles(relativePath, links = []) {
   return files;
 }
 
+// Root agents/*.md are themselves generated from the skill-local bodies, so a
+// drift there is fixed in the body (or the AGENTS entry above for frontmatter).
+function editSource(file) {
+  const agent = AGENTS.find(({ id }) => file === path.join("agents", `${id}.md`));
+  if (!agent) {
+    return file;
+  }
+  return `${path.join("skills", "ship", "references", "agents", `${agent.id}.md`)} (or its AGENTS entry in scripts/sync-adapters.mjs)`;
+}
+
 async function syncClaudePackage({ check, errors, written, removed }) {
   // Each root file lands at the same relative path inside claude/.
   const expected = new Set();
@@ -178,7 +188,8 @@ async function syncClaudePackage({ check, errors, written, removed }) {
 
   // The Claude plugin directory skips symbolic links, so a link here would be
   // a file missing from the package even though it reads the same as its
-  // source. Links are never read through: they leave `present` in both modes.
+  // source. Links are never read through. Every link except README.md leaves
+  // `present`; README.md stays so it isn't also reported missing.
   const links = [];
   const present = new Set(
     (await listFiles(CLAUDE_PACKAGE_DIR, links)).map((file) => path.relative(CLAUDE_PACKAGE_DIR, file))
@@ -229,9 +240,22 @@ async function syncClaudePackage({ check, errors, written, removed }) {
     const target = path.join(CLAUDE_PACKAGE_DIR, file);
     const sourcePath = path.join(repoRoot, file);
     const targetPath = path.join(repoRoot, target);
-    const sourceBytes = await fs.readFile(sourcePath);
-    // The installer and the ensure-ready scripts must stay executable.
-    const sourceMode = (await fs.stat(sourcePath)).mode & 0o777;
+    let sourceBytes;
+    let sourceMode;
+    try {
+      sourceBytes = await fs.readFile(sourcePath);
+      // The installer and the ensure-ready scripts must stay executable.
+      sourceMode = (await fs.stat(sourcePath)).mode & 0o777;
+    } catch (error) {
+      if (error.code === "EISDIR") {
+        errors.push(`${file} is a symbolic link to a directory; claude/ copies regular files only. Replace the link with the files.`);
+      } else if (error.code === "ENOENT") {
+        errors.push(`${file} is a symbolic link whose target is missing.`);
+      } else {
+        errors.push(`Could not read ${file}: ${error.message}`);
+      }
+      continue;
+    }
     let difference = "missing";
     if (present.has(file)) {
       const sameBytes = sourceBytes.equals(await fs.readFile(targetPath));
@@ -246,7 +270,7 @@ async function syncClaudePackage({ check, errors, written, removed }) {
         errors.push(`${target} is missing. ${rerun}`);
       } else {
         errors.push(
-          `${target} differs from ${file} (${difference}). claude/ is generated: make the change in ${file}, then ${rerun.toLowerCase()} A sync overwrites edits made only in claude/.`
+          `${target} differs from ${file} (${difference}). claude/ is generated: make the change in ${editSource(file)}, then ${rerun.toLowerCase()} A sync overwrites edits made only in claude/.`
         );
       }
       continue;

@@ -199,6 +199,27 @@ test("symlinks inside claude/ fail validation, dangling or not, and are never fo
   assert.doesNotMatch(result.stderr, /ENOENT/);
 });
 
+test("a drift in a generated agent names the skill-local body to edit", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-agent-");
+  await copyPackage(cwd);
+  const agentPath = path.join(cwd, "claude", "agents", "task-executor.md");
+  await writeFile(agentPath, `${await readFile(agentPath, "utf8")}\nEdited in claude/ only.\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /make the change in skills\/ship\/references\/agents\/task-executor\.md/);
+});
+
+test("a symlinked directory under a root source is named, not a bare EISDIR", async () => {
+  const cwd = await makeTemp("hamster-plugin-source-link-");
+  await copyPackage(cwd);
+  await symlink("../qa", path.join(cwd, "skills", "setup", "qa-link"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /skills\/setup\/qa-link is a symbolic link to a directory/);
+});
+
 test("a claude/ copy that loses its executable bit fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-claude-mode-");
   await copyPackage(cwd);
@@ -217,11 +238,15 @@ test("syncing never deletes a symlinked claude/README.md, which it cannot regene
   await copyPackage(cwd);
   await unlink(path.join(cwd, "claude", "README.md"));
   await symlink("../README.md", path.join(cwd, "claude", "README.md"));
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
 
   const sync = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs")], { cwd });
   assert.equal(sync.code, 1);
   assert.match(sync.stderr, /claude\/README\.md is a symbolic link; replace it with a regular file/);
   assert.equal((await lstat(path.join(cwd, "claude", "README.md"))).isSymbolicLink(), true);
+  // What the sync already changed is reported even though it then fails.
+  assert.match(sync.stdout, /Wrote claude\/skills\/qa\/SKILL\.md/);
 });
 
 test("syncing claude/ copies edits, drops orphans and links, and keeps its README", async () => {
@@ -597,6 +622,7 @@ for (const checksum of ["wrong", "empty", "missing"]) {
     const result = await invoke();
     assert.equal(result.code, 1);
     assert.match(result.stderr, checksum === "missing" ? /Failed to download the checksum/ : /Checksum mismatch/);
+    assert.match(result.stderr, /Install it by hand instead/);
     assert.equal(await pathExists(binary), false);
   });
 }
@@ -614,6 +640,7 @@ test("a binary that dies silently is reported with its exit status or signal", a
     ["exit 3", /failed to run \(exit status 3\)$/m],
     ["kill -9 $$", /failed to run \(killed by signal 9\)$/m],
     ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
+    ["echo 'bad cpu type'; exit 1", /failed to run \(exit status 1\): bad cpu type$/m],
   ]) {
     const { invoke } = await runInstaller({ binary: script });
     const result = await invoke();
