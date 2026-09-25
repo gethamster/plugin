@@ -8,6 +8,7 @@
     "email": "hello@tryhamster.com"
   },
   "homepage": "https://tryhamster.com",
+  "privacyPolicyUrl": "https://tryhamster.com/privacy-policy",
   "repository": "https://github.com/gethamster/plugin",
   "mcpServers": "./.mcp.json",
   "license": "MIT",

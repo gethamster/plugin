@@ -313,4 +313,4 @@ Use this only when you want the hosted MCP tools in a client without installing 
 
 ## License
 
-MIT. Copyright Hamster Studio. The MIT grant covers the plugin package and source files in this repository; prebuilt `hamster` binaries distributed through GitHub Releases are provided under Hamster's [Commercial Terms](https://tryhamster.com/terms-of-service).
+MIT. Copyright Hamster Studio. See Hamster's [Privacy Policy](https://tryhamster.com/privacy-policy) for how Hamster handles your data. The MIT grant covers the plugin package and source files in this repository; prebuilt `hamster` binaries distributed through GitHub Releases are provided under Hamster's [Commercial Terms](https://tryhamster.com/terms-of-service).
