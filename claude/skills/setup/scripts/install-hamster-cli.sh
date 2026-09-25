@@ -17,10 +17,8 @@
 # rewritten is reported with the fix to make by hand; and a failed download,
 # checksum mismatch, or unexpected archive ends with the manual install steps.
 #
-# Mirrors the hosted script with this SHA-256. A daily scheduled workflow
-# (installer-mirror.yml) fetches the hosted script and opens an issue when its
-# hash changes, so a change there gets carried over here before this pin is
-# updated:
+# The SHA-256 of the hosted script this copy mirrors. Update it when carrying
+# the hosted script's changes over:
 # hosted-installer-sha256: 4771367e627ba757b01e5e40374d5745da2cd93591b2e1bec737766f13c3ef7a
 set -euo pipefail
 
