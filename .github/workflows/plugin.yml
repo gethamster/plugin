@@ -33,10 +33,9 @@ jobs:
           name: codex-skills-only-bundle-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/*.zip
 
-  # The setup skill runs a readable copy of https://tryhamster.com/cli/install,
-  # which is served from the studio repo. This fails when the hosted script's
-  # bytes stop matching the hash pinned in the copy, so a new platform, URL, or
-  # config step there is carried over here. It is kept out of validate so a
+  # The setup skill runs a readable copy of https://tryhamster.com/cli/install.
+  # This fails when the hosted script's bytes stop matching the hash pinned in
+  # the copy, so a new platform, URL, or config step there is carried over here. It is kept out of validate so a
   # website deploy never holds up a plugin version tag.
   installer-mirror:
     runs-on: ubuntu-latest
