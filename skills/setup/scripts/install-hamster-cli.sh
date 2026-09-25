@@ -227,8 +227,8 @@ printf 'api_url: "%s"\n' "$API_URL" >>"$config" || fail "$cannot_write"
 
 info "Hamster CLI installed: $version"
 info "Configured API URL: $API_URL"
-if [ "$path_updated" = true ]; then
-  info "Restart your shell (or run: source ~/.zshrc) to pick up the PATH change."
+if [ "$path_updated" = true ] && [ -n "$rc_file" ]; then
+  info "Restart your shell (or run: source $rc_file) to pick up the PATH change."
 fi
 cat <<'EOF'
 

@@ -823,6 +823,7 @@ test("a login shell other than bash or zsh gets a PATH warning, even with a .bas
   const result = await invoke({ SHELL: "/usr/bin/fish" });
   assert.equal(result.code, 0, result.stderr);
   assert.match(result.stderr, /\[WARN\] Your login shell \(\/usr\/bin\/fish\) doesn't read ~\/\.zshrc or ~\/\.bashrc/);
+  assert.doesNotMatch(result.stdout, /Restart your shell/);
   assert.equal(await pathExists(binary), true);
 
   const bashResult = await invoke();
