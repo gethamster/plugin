@@ -10,9 +10,14 @@ import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const validatorPath = path.join(repoRoot, "scripts", "validate-plugin.mjs");
-const bundleBuilderPath = path.join(repoRoot, "scripts", "build-codex-skills-bundle.mjs");
-const readyScript = path.join(repoRoot, "skills", "setup", "scripts", "ensure-ready.sh");
+// Scripts are spawned by these fixed relative paths from a known cwd (a
+// fixture copy, or the checkout for the setup scripts), never by an absolute
+// path built from where the checkout happens to live.
+const VALIDATOR = "scripts/validate-plugin.mjs";
+const BUNDLE_BUILDER = "scripts/build-codex-skills-bundle.mjs";
+const SYNC_ADAPTERS = "scripts/sync-adapters.mjs";
+const READY_SCRIPT = "skills/setup/scripts/ensure-ready.sh";
+const INSTALLER_SCRIPT = "skills/setup/scripts/install-hamster-cli.sh";
 
 const PACKAGE_ENTRIES = [
   "plugin.json",
@@ -77,7 +82,7 @@ async function copyPackage(dest) {
 }
 
 async function runValidator(cwd) {
-  return run(process.execPath, [validatorPath], { cwd });
+  return run(process.execPath, [VALIDATOR], { cwd });
 }
 
 async function patchCodexManifest(cwd, patch) {
@@ -121,7 +126,7 @@ async function pathExists(target) {
 
 async function buildCodexBundle(cwd, args = []) {
   const outDir = path.join(cwd, "dist");
-  const result = await run(process.execPath, [bundleBuilderPath, "--out", outDir, ...args], { cwd });
+  const result = await run(process.execPath, [BUNDLE_BUILDER, "--out", outDir, ...args], { cwd });
   const version = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
   return { result, zipPath: path.join(outDir, `hamster-codex-skills-only-${version}.zip`) };
 }
@@ -241,7 +246,7 @@ test("syncing never deletes a symlinked claude/README.md, which it cannot regene
   const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
   await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
 
-  const sync = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs")], { cwd });
+  const sync = await run(process.execPath, [SYNC_ADAPTERS], { cwd });
   assert.equal(sync.code, 1);
   assert.match(sync.stderr, /claude\/README\.md is a symbolic link; replace it with a regular file/);
   assert.equal((await lstat(path.join(cwd, "claude", "README.md"))).isSymbolicLink(), true);
@@ -260,14 +265,14 @@ test("syncing claude/ copies edits, drops orphans and links, and keeps its READM
   await unlink(path.join(cwd, "claude", "LICENSE"));
   await symlink("../LICENSE", path.join(cwd, "claude", "LICENSE"));
 
-  const sync = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs")], { cwd });
+  const sync = await run(process.execPath, [SYNC_ADAPTERS], { cwd });
   assert.equal(sync.code, 0, sync.stderr);
   assert.deepEqual(await readFile(readmePath), readme);
   assert.deepEqual(await readFile(path.join(cwd, "claude", "skills", "qa", "SKILL.md")), await readFile(skillPath));
   assert.equal(await pathExists(path.join(cwd, "claude", "skills", "qa", "notes.md")), false);
   assert.equal((await lstat(path.join(cwd, "claude", "LICENSE"))).isFile(), true);
 
-  const check = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs"), "--check"], { cwd });
+  const check = await run(process.execPath, [SYNC_ADAPTERS, "--check"], { cwd });
   assert.equal(check.code, 0, check.stderr);
 });
 
@@ -485,12 +490,12 @@ test("archive bytes follow the checkout, not the machine building it", async () 
   // A reviewer rebuilding the branch to compare hashes runs under their own
   // umask and timezone, and zip records both unless the build pins them.
   const digests = [];
-  for (const shell of ["umask 022; TZ=UTC", "umask 002; TZ=Asia/Tokyo"]) {
-    const result = await run(
-      "sh",
-      ["-c", `${shell}; "${process.execPath}" "${bundleBuilderPath}" --out dist`],
-      { cwd }
-    );
+  for (const [umask, tz] of [[0o022, "UTC"], [0o002, "Asia/Tokyo"]]) {
+    // A child inherits the umask in force when it is spawned.
+    const previous = process.umask(umask);
+    const pending = run(process.execPath, [BUNDLE_BUILDER, "--out", "dist"], { cwd, env: { ...process.env, TZ: tz } });
+    process.umask(previous);
+    const result = await pending;
     assert.equal(result.code, 0, result.stderr);
     const version = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
     const zipPath = path.join(cwd, "dist", `hamster-codex-skills-only-${version}.zip`);
@@ -535,7 +540,8 @@ exit 0
   );
   await chmod(hamster, 0o755);
 
-  const result = await run("bash", [readyScript], {
+  const result = await run("bash", [READY_SCRIPT], {
+    cwd: repoRoot,
     env: {
       ...process.env,
       HOME: home,
@@ -548,7 +554,6 @@ exit 0
   assert.match(result.stderr, /status failed: not logged in/);
 });
 
-const installerScript = path.join(repoRoot, "skills", "setup", "scripts", "install-hamster-cli.sh");
 
 // Runs the real installer against a fake release: a stub `curl` serves a
 // tarball and its checksum from `release/`, and a stub `rm` refuses the
@@ -612,7 +617,7 @@ exec /bin/rm "$@"
   }
 
   const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${stubs}${path.delimiter}${process.env.PATH ?? ""}` };
-  const invoke = () => run("bash", [installerScript], { env });
+  const invoke = () => run("bash", [INSTALLER_SCRIPT], { cwd: repoRoot, env });
   return { home, configPath, invoke, binary: path.join(home, ".hamster", "bin", "hamster") };
 }
 
