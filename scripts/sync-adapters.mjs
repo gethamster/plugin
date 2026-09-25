@@ -138,7 +138,8 @@ export async function syncAdapters({ check = false } = {}) {
   return { errors, written, removed };
 }
 
-async function listFiles(relativePath) {
+// A symbolic link is listed as one entry and never followed; `links` collects it.
+async function listFiles(relativePath, links = []) {
   const absolutePath = path.join(repoRoot, relativePath);
   let stat;
   try {
@@ -149,12 +150,15 @@ async function listFiles(relativePath) {
     }
     throw error;
   }
+  if (stat.isSymbolicLink()) {
+    links.push(relativePath);
+  }
   if (!stat.isDirectory()) {
     return [relativePath];
   }
   const files = [];
   for (const entry of await fs.readdir(absolutePath)) {
-    files.push(...(await listFiles(path.join(relativePath, entry))));
+    files.push(...(await listFiles(path.join(relativePath, entry), links)));
   }
   return files;
 }
@@ -172,10 +176,23 @@ async function syncClaudePackage({ check, errors, written, removed }) {
     }
   }
 
+  // The directory skips symbolic links, so a link here would be a file missing
+  // from the package even though it reads the same as its source.
+  const links = [];
   const present = new Set(
-    (await listFiles(CLAUDE_PACKAGE_DIR)).map((file) => path.relative(CLAUDE_PACKAGE_DIR, file))
+    (await listFiles(CLAUDE_PACKAGE_DIR, links)).map((file) => path.relative(CLAUDE_PACKAGE_DIR, file))
   );
   const rerun = "Run `node scripts/sync-adapters.mjs`.";
+
+  for (const link of links) {
+    if (check) {
+      errors.push(`${link} is a symbolic link; claude/ must hold regular files. ${rerun}`);
+    } else {
+      await fs.rm(path.join(repoRoot, link));
+      removed.push(link);
+      present.delete(path.relative(CLAUDE_PACKAGE_DIR, link));
+    }
+  }
 
   for (const own of CLAUDE_PACKAGE_OWN_FILES) {
     if (!present.has(own)) {
@@ -184,10 +201,10 @@ async function syncClaudePackage({ check, errors, written, removed }) {
   }
 
   for (const file of present) {
-    if (expected.has(file) || CLAUDE_PACKAGE_OWN_FILES.has(file)) {
+    const target = path.join(CLAUDE_PACKAGE_DIR, file);
+    if (expected.has(file) || CLAUDE_PACKAGE_OWN_FILES.has(file) || links.includes(target)) {
       continue;
     }
-    const target = path.join(CLAUDE_PACKAGE_DIR, file);
     if (check) {
       errors.push(`${target} has no source at the repository root. ${rerun}`);
     } else {
