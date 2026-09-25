@@ -524,7 +524,7 @@ const installerScript = path.join(repoRoot, "skills", "setup", "scripts", "insta
 // Runs the real installer against a fake release: a stub `curl` serves a
 // tarball and its checksum from `release/`, and a stub `rm` refuses the
 // legacy /usr/local/bin/hamster path so a test can never delete a real binary.
-async function runInstaller({ checksum = "match", config = null, rc = "" } = {}) {
+async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true } = {}) {
   const root = await makeTemp("hamster-installer-");
   const home = path.join(root, "home");
   const stubs = path.join(root, "stubs");
@@ -533,7 +533,7 @@ async function runInstaller({ checksum = "match", config = null, rc = "" } = {})
   await mkdir(stubs, { recursive: true });
   await mkdir(path.join(release, "pkg"), { recursive: true });
 
-  await writeFile(path.join(release, "pkg", "hamster"), "#!/usr/bin/env bash\necho 'hamster version v0.0.0-test'\n");
+  await writeFile(path.join(release, "pkg", "hamster"), `#!/usr/bin/env bash\n${binary}\n`);
   await chmod(path.join(release, "pkg", "hamster"), 0o755);
   const tar = await run("tar", ["-czf", path.join(release, "archive.tar.gz"), "-C", path.join(release, "pkg"), "hamster"]);
   assert.equal(tar.code, 0, tar.stderr);
@@ -544,6 +544,9 @@ async function runInstaller({ checksum = "match", config = null, rc = "" } = {})
     await writeFile(path.join(release, "archive.sha256"), `${"0".repeat(64)}  archive.tar.gz\n`);
   } else if (checksum === "empty") {
     await writeFile(path.join(release, "archive.sha256"), "");
+  }
+  if (!archive) {
+    await unlink(path.join(release, "archive.tar.gz"));
   }
 
   await writeFile(
@@ -593,6 +596,27 @@ for (const checksum of ["wrong", "empty", "missing"]) {
     assert.equal(await pathExists(binary), false);
   });
 }
+
+test("a failed download ends with the manual install steps", async () => {
+  const { invoke, binary } = await runInstaller({ archive: false });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Failed to download .*Install it by hand instead: download hamster-.*\.tar\.gz and hamster-.*\.tar\.gz\.sha256 from https:\/\/github\.com\/gethamster\/plugin\/releases\/latest/);
+  assert.equal(await pathExists(binary), false);
+});
+
+test("a binary that dies silently is reported with its exit status or signal", async () => {
+  for (const [script, expected] of [
+    ["exit 3", /failed to run \(exit status 3\)$/m],
+    ["kill -9 $$", /failed to run \(killed by signal 9\)$/m],
+    ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
+  ]) {
+    const { invoke } = await runInstaller({ binary: script });
+    const result = await invoke();
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, expected);
+  }
+});
 
 test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {
   const { home, configPath, invoke, binary } = await runInstaller({

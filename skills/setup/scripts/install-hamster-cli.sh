@@ -11,9 +11,11 @@
 #
 # Deliberate differences from the hosted script, to keep when carrying its
 # changes over: the checksum is required (the hosted script skips a missing
-# one), there are no VERSION or HAMSTER_INSTALL_DIR overrides, and a failure to
-# read config.yaml, comment out an alias, or run the new binary stops with the
-# reason instead of passing silently.
+# one); there are no VERSION or HAMSTER_INSTALL_DIR overrides; indented stale
+# aliases are commented out too; a config.yaml that can't be read, or a binary
+# that won't run, stops the install with the reason; an alias that can't be
+# rewritten is reported with the fix to make by hand; and a failed download
+# ends with the manual install steps.
 #
 # Mirrors the hosted script with this SHA-256. CI fetches the hosted script and
 # fails when its hash changes, so a change there gets carried over here before
@@ -39,18 +41,21 @@ esac
 case "$(uname -m)" in
   x86_64) arch="amd64" ;;
   arm64 | aarch64) arch="arm64" ;;
-  *) fail "Unsupported architecture: $(uname -m)" ;;
+  *) fail "Unsupported architecture: $(uname -m). Download a binary from https://github.com/${REPO}/releases/latest" ;;
 esac
 
 archive="hamster-${os}-${arch}.tar.gz"
 url="https://github.com/${REPO}/releases/latest/download/${archive}"
+# If a release ever stops matching what this script expects, it ends with the
+# manual steps rather than a dead end.
+manual="Install it by hand instead: download ${archive} and ${archive}.sha256 from https://github.com/${REPO}/releases/latest, check that they match, and put the hamster binary from the archive in ${INSTALL_DIR}."
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 info "Downloading $url"
-curl -fsSL "$url" -o "$work/$archive" || fail "Failed to download $url"
-curl -fsSL "$url.sha256" -o "$work/$archive.sha256" || fail "Failed to download the checksum at $url.sha256"
+curl -fsSL "$url" -o "$work/$archive" || fail "Failed to download $url. $manual"
+curl -fsSL "$url.sha256" -o "$work/$archive.sha256" || fail "Failed to download the checksum at $url.sha256. $manual"
 
 if command -v sha256sum >/dev/null 2>&1; then
   actual="$(sha256sum "$work/$archive" | awk '{print $1}')"
@@ -63,8 +68,8 @@ expected="$(awk '{print $1}' "$work/$archive.sha256")"
 [ -n "$expected" ] && [ "$expected" = "$actual" ] || fail "Checksum mismatch: expected ${expected:-nothing}, got $actual"
 info "Checksum verified"
 
-tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive"
-[ -f "$work/$BINARY" ] || fail "$archive does not contain $BINARY"
+tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manual"
+[ -f "$work/$BINARY" ] || fail "$archive does not contain $BINARY. $manual"
 
 # Stage next to the destination and rename, so the swap is atomic and lands on
 # a fresh inode: macOS kills an executable whose inode was rewritten in place.
@@ -123,8 +128,20 @@ update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
 
 version_err="$work/version.err"
-version="$("$INSTALL_DIR/$BINARY" --version 2>"$version_err")" ||
-  fail "Installed $INSTALL_DIR/$BINARY but it failed to run: $(cat "$version_err")"
+code=0
+version="$("$INSTALL_DIR/$BINARY" --version 2>"$version_err")" || code=$?
+if [ "$code" -ne 0 ]; then
+  # A macOS code-signing kill or a loader abort prints nothing, so name the
+  # exit status or signal as well as whatever the binary printed.
+  reason="$(cat "$version_err")"
+  reason="${reason:-$version}"
+  if [ "$code" -gt 128 ]; then
+    how="killed by signal $((code - 128))"
+  else
+    how="exit status $code"
+  fi
+  fail "Installed $INSTALL_DIR/$BINARY but it failed to run ($how)${reason:+: $reason}"
+fi
 
 config="$HOME/.hamster/config.yaml"
 if [ -f "$config" ]; then
