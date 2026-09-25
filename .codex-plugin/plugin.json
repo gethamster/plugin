@@ -1,6 +1,6 @@
 {
   "name": "hamster",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
   "author": {
     "name": "Hamster",
