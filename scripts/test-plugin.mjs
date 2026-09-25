@@ -781,20 +781,30 @@ test("a read-only shell rc file is a warning, and the install still finishes", a
   const result = await invoke();
   await chmod(bashrc, 0o644);
   assert.equal(result.code, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
   assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add alias ham='hamster' to it by hand/);
   assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
   assert.equal(await pathExists(binary), true);
   assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
 });
 
-test("an rc file the user can't touch, like a home-manager symlink, doesn't stop the install", async () => {
+test("an rc file the user can't touch, like a home-manager symlink, doesn't stop the install", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only file");
+    return;
+  }
   const { home, configPath, invoke, binary } = await runInstaller();
   const bashrc = path.join(home, ".bashrc");
+  // A file owned by root stands in for a symlink into a read-only store such
+  // as the nix store: a non-root user can neither write nor touch it. (Root is
+  // skipped above, so this never writes to it.)
   await unlink(bashrc);
-  // A root-owned system file stands in for a symlink into a read-only store.
   await symlink("/etc/shells", bashrc);
   const result = await invoke();
   assert.equal(result.code, 0, result.stderr);
+  // The file exists, so it isn't touched, and bash reads it.
+  assert.doesNotMatch(result.stderr, /Could not create/);
+  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
   assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
   assert.equal(await pathExists(binary), true);
   assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
@@ -808,13 +818,15 @@ test("a config.yaml the installer can't write names the reason", async () => {
   assert.match(result.stderr, /Is a directory[\s\S]*\[ERROR\] Could not write .*config\.yaml \(the reason is above\)/);
 });
 
-test("a login shell with no .zshrc or .bashrc gets a PATH warning", async () => {
-  const { home, invoke, binary } = await runInstaller();
-  await unlink(path.join(home, ".bashrc"));
+test("a login shell other than bash or zsh gets a PATH warning, even with a .bashrc", async () => {
+  const { invoke, binary } = await runInstaller();
   const result = await invoke({ SHELL: "/usr/bin/fish" });
   assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stderr, /\[WARN\] No ~\/\.zshrc or ~\/\.bashrc to update/);
+  assert.match(result.stderr, /\[WARN\] Your login shell \(\/usr\/bin\/fish\) doesn't read ~\/\.zshrc or ~\/\.bashrc/);
   assert.equal(await pathExists(binary), true);
+
+  const bashResult = await invoke();
+  assert.doesNotMatch(bashResult.stderr, /doesn't read ~\/\.zshrc/);
 });
 
 test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {

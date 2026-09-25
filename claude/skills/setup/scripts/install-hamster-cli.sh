@@ -180,10 +180,10 @@ if [ -n "$rc_file" ] && [ ! -e "$rc_file" ] && ! touch "$rc_file" 2>/dev/null; t
 fi
 update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
-# A login shell other than bash or zsh (fish, nushell) has neither file, so say
-# so rather than finish with hamster off PATH.
-if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ] && ! grep -qsF '.hamster/bin' "$HOME/.zshrc" "$HOME/.bashrc"; then
-  warn "No ~/.zshrc or ~/.bashrc to update. Add $INSTALL_DIR to PATH in your shell's startup file by hand."
+# A login shell other than bash or zsh (fish, nushell) reads neither file, so
+# say so rather than finish with hamster off PATH.
+if [ -z "$rc_file" ] && [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ]; then
+  warn "Your login shell (${SHELL:-unknown}) doesn't read ~/.zshrc or ~/.bashrc. Add $INSTALL_DIR to PATH in its startup file by hand (fish: fish_add_path $INSTALL_DIR)."
 fi
 if [ "$INSTALL_DIR" != "$DEFAULT_INSTALL_DIR" ]; then
   warn "Custom install dir: make sure $INSTALL_DIR is on your PATH."
