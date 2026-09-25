@@ -70,4 +70,6 @@ When the check prints `READY`, confirm this repo now has `.hamster/`. If the cli
 - Antigravity: in the CLI, open `/mcp`, select `hamster_hamster`, then Authenticate; in the app, select Authenticate on `hamster_hamster` under Settings → Customizations → Installed MCP Servers.
 - Pi has no MCP; Hamster runs through the CLI.
 
+If the client has no Hamster MCP server, as in a skills-only install from Codex's Plugins Directory, `ask-hamster` still works through the CLI. To add the Hamster tools, tell the user to add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth; in Codex that is `codex mcp add hamster --url https://tryhamster.com/mcp`, then `codex mcp login hamster`. This is the plugin README's "Advanced: hosted MCP without the plugin".
+
 Then tell the user they can ask Hamster about this repo with the `ask-hamster` skill and ship a brief with `ship`.
