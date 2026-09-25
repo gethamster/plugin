@@ -225,6 +225,16 @@ test("a symlinked directory under a root source is named, not a bare EISDIR", as
   assert.match(result.stderr, /skills\/setup\/qa-link is a symbolic link to a directory/);
 });
 
+test("a dangling symlink under a root source is named, not a bare ENOENT", async () => {
+  const cwd = await makeTemp("hamster-plugin-source-dangle-");
+  await copyPackage(cwd);
+  await symlink("../nope.md", path.join(cwd, "skills", "setup", "dangle.md"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /skills\/setup\/dangle\.md is a symbolic link whose target is missing/);
+});
+
 test("a claude/ copy that loses its executable bit fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-claude-mode-");
   await copyPackage(cwd);
@@ -553,7 +563,6 @@ exit 0
   assert.equal(result.stdout.trim(), "SETUP_NEEDED");
   assert.match(result.stderr, /status failed: not logged in/);
 });
-
 
 // Runs the real installer against a fake release: a stub `curl` serves a
 // tarball and its checksum from `release/`, and a stub `rm` refuses the

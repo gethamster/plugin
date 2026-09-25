@@ -14,8 +14,8 @@
 # one); there are no VERSION or HAMSTER_INSTALL_DIR overrides; indented stale
 # aliases are commented out too; a config.yaml that can't be read, or a binary
 # that won't run, stops the install with the reason; an alias that can't be
-# rewritten is reported with the fix to make by hand; and a failed download
-# ends with the manual install steps.
+# rewritten is reported with the fix to make by hand; and a failed download,
+# checksum mismatch, or unexpected archive ends with the manual install steps.
 #
 # Mirrors the hosted script with this SHA-256. CI fetches the hosted script and
 # fails when its hash changes, so a change there gets carried over here before
