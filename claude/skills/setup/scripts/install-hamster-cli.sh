@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Install the Hamster CLI. No sudo.
 #
-# This is the Hamster CLI installer. https://tryhamster.com/cli/install serves
-# this file, and the plugin's setup skill runs it directly, so both install
-# paths run the same script:
+# This is the Hamster CLI installer. https://tryhamster.com/cli/install
+# redirects to this file on the main branch, and the plugin's setup skill runs
+# it directly, so both install paths run the same script:
 #
 #   curl -fsSL https://tryhamster.com/cli/install | bash
+#
+# That redirect names this exact path, so moving or renaming the file breaks
+# the install URL.
 #
 # It downloads a release archive from github.com/gethamster/plugin, refuses to
 # install unless the archive matches the SHA-256 published next to it, installs
@@ -21,15 +24,21 @@
 #   HAMSTER_URL          The Hamster server the CLI talks to, written to
 #                        api_url. Default: https://tryhamster.com.
 #
-# Every failure stops with an [ERROR] line that gives the reason. A failed
-# download, a checksum mismatch, or an unexpected archive also gives the
-# manual install steps.
+# Every failure stops with an [ERROR] line that gives the reason, except that
+# a stale alias the installer can't rewrite is a [WARN] with the fix to make by
+# hand. A failed download, a checksum mismatch, or an unexpected archive also
+# gives the manual install steps.
 set -euo pipefail
 
 REPO="gethamster/plugin"
 DEFAULT_INSTALL_DIR="$HOME/.hamster/bin"
 INSTALL_DIR="${HAMSTER_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 RELEASE="${HAMSTER_VERSION:-${VERSION:-latest}}"
+if [ -n "${HAMSTER_VERSION:-}" ]; then
+  release_source="HAMSTER_VERSION"
+elif [ -n "${VERSION:-}" ]; then
+  release_source="VERSION"
+fi
 API_URL="${HAMSTER_URL:-https://tryhamster.com}"
 BINARY="hamster"
 LEGACY_BINARY="/usr/local/bin/hamster"
@@ -41,8 +50,8 @@ fail() { printf '[ERROR] %s\n' "$1" >&2; exit 1; }
 # api_url is written into YAML inside double quotes, so allow only a plain
 # http(s) URL.
 case "$API_URL" in
-  http://* | https://*) ;;
-  *) fail "HAMSTER_URL must start with http:// or https://, got: $API_URL" ;;
+  http://?* | https://?*) ;;
+  *) fail "HAMSTER_URL must be an http:// or https:// URL with a host, like https://tryhamster.com, got: ${API_URL:-nothing}" ;;
 esac
 case "$API_URL" in
   *[[:space:]\"\\]*) fail "HAMSTER_URL must not contain spaces, quotes, or backslashes, got: $API_URL" ;;
@@ -61,11 +70,16 @@ case "$(uname -m)" in
 esac
 
 archive="hamster-${os}-${arch}.tar.gz"
+missing_release=""
 if [ "$RELEASE" = "latest" ]; then
   release_page="https://github.com/${REPO}/releases/latest"
   url="https://github.com/${REPO}/releases/latest/download/${archive}"
 else
-  release_page="https://github.com/${REPO}/releases/tag/${RELEASE}"
+  # A pinned release that doesn't exist, or a VERSION set for something else,
+  # should be named, not sent to a tag page that is itself a 404.
+  info "Installing release $RELEASE, set by $release_source"
+  release_page="https://github.com/${REPO}/releases"
+  missing_release=" If release $RELEASE doesn't exist, fix or unset $release_source (tags look like v1.68.0)."
   url="https://github.com/${REPO}/releases/download/${RELEASE}/${archive}"
 fi
 # A failed download, a checksum that doesn't match, or an archive laid out
@@ -76,8 +90,8 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 info "Downloading $url"
-curl -fsSL "$url" -o "$work/$archive" || fail "Failed to download $url. $manual"
-curl -fsSL "$url.sha256" -o "$work/$archive.sha256" || fail "Failed to download the checksum at $url.sha256. $manual"
+curl -fsSL "$url" -o "$work/$archive" || fail "Failed to download $url.${missing_release} $manual"
+curl -fsSL "$url.sha256" -o "$work/$archive.sha256" || fail "Failed to download the checksum at $url.sha256.${missing_release} $manual"
 
 if command -v sha256sum >/dev/null 2>&1; then
   actual="$(sha256sum "$work/$archive" | awk '{print $1}')"
@@ -95,10 +109,11 @@ tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manua
 
 # Stage next to the destination and rename, so the swap is atomic and lands on
 # a fresh inode: macOS kills an executable whose inode was rewritten in place.
-mkdir -p "$INSTALL_DIR" 2>/dev/null || fail "Could not create $INSTALL_DIR. Make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
-mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new"
-chmod +x "$INSTALL_DIR/.$BINARY.new"
-mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY"
+mkdir -p "$INSTALL_DIR" || fail "Could not create $INSTALL_DIR (the reason is above). Fix that path, or set HAMSTER_INSTALL_DIR to a directory you own."
+cannot_install="Could not write to $INSTALL_DIR. Make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
+mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new" 2>/dev/null || fail "$cannot_install"
+chmod +x "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
+mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY" 2>/dev/null || fail "$cannot_install"
 info "Installed $INSTALL_DIR/$BINARY"
 
 # A root-installed binary from the old sudo installer would shadow this one for
@@ -133,12 +148,13 @@ update_rc() {
     rm -f "$rc.hamster-bak"
   done
   if ! grep -qF "alias ham='hamster'" "$rc"; then
-    printf "alias ham='hamster'\n" >>"$rc"
+    printf "alias ham='hamster'\n" 2>/dev/null >>"$rc" || fail "Could not write $rc. Add alias ham='hamster' to it by hand, or make it writable."
     info "Added 'ham' alias in $rc"
   fi
   if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ] && ! grep -qF '.hamster/bin' "$rc"; then
     # shellcheck disable=SC2016 # $HOME and $PATH expand when the rc file runs.
-    printf '\n# Added by the Hamster CLI installer\nexport PATH="$HOME/.hamster/bin:$PATH"\n' >>"$rc"
+    printf '\n# Added by the Hamster CLI installer\nexport PATH="$HOME/.hamster/bin:$PATH"\n' 2>/dev/null >>"$rc" ||
+      fail "Could not write $rc. Add $INSTALL_DIR to PATH in it by hand, or make it writable."
     info "Added $INSTALL_DIR to PATH in $rc"
     path_updated=true
   fi
@@ -146,8 +162,8 @@ update_rc() {
 
 # Make sure the login shell's rc file exists so the PATH entry has somewhere to land.
 case "${SHELL:-}" in
-  */zsh) touch "$HOME/.zshrc" ;;
-  */bash) touch "$HOME/.bashrc" ;;
+  */zsh) touch "$HOME/.zshrc" 2>/dev/null || fail "Could not create $HOME/.zshrc. Add $INSTALL_DIR to PATH by hand." ;;
+  */bash) touch "$HOME/.bashrc" 2>/dev/null || fail "Could not create $HOME/.bashrc. Add $INSTALL_DIR to PATH by hand." ;;
 esac
 update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
@@ -174,7 +190,7 @@ fi
 config_dir="$HOME/.hamster"
 config="$config_dir/config.yaml"
 cannot_write="Could not write $config, so the CLI is installed but not pointed at Hamster. Make $config_dir writable, or set api_url: \"$API_URL\" in $config by hand."
-mkdir -p "$config_dir" 2>/dev/null || fail "$cannot_write"
+mkdir -p "$config_dir" || fail "Could not create $config_dir (the reason is above), so the CLI is installed but not pointed at Hamster. Fix that path, then set api_url: \"$API_URL\" in $config by hand."
 if [ -f "$config" ]; then
   # A failed redirect also exits 1, like grep with no lines left, so check
   # that the temp file can be written before trusting grep's status.

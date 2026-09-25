@@ -603,8 +603,8 @@ case "$url" in
   *.sha256) src="${release}/archive.sha256" ;;
   *) src="${release}/archive.tar.gz" ;;
 esac
-[ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
 echo "$url" >>"${release}/requested"
+[ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
 cp "$src" "$out"
 `
   );
@@ -730,6 +730,44 @@ test("the CLI installer reads the older VERSION variable too", async () => {
   const result = await invoke();
   assert.equal(result.code, 0, result.stderr);
   assert.match((await requested())[0], /\/releases\/download\/v0\.9\.0\//);
+});
+
+test("HAMSTER_VERSION wins over VERSION, and a failed pinned download names that release", async () => {
+  const { invoke, requested } = await runInstaller({
+    archive: false,
+    extraEnv: { HAMSTER_VERSION: "v1.2.3", VERSION: "v0.9.0" },
+  });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match((await requested())[0], /\/releases\/download\/v1\.2\.3\//);
+  assert.match(result.stdout, /Installing release v1\.2\.3, set by HAMSTER_VERSION/);
+  assert.match(result.stderr, /If release v1\.2\.3 doesn't exist, fix or unset HAMSTER_VERSION/);
+  assert.match(result.stderr, /from https:\/\/github\.com\/gethamster\/plugin\/releases,/);
+});
+
+test("the CLI installer rejects a HAMSTER_URL that isn't http(s) or has no host", async () => {
+  for (const value of ["ftp://example.com", "https://"]) {
+    const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: value } });
+    const result = await invoke();
+    assert.equal(result.code, 1, value);
+    assert.match(result.stderr, /HAMSTER_URL must be an http:\/\/ or https:\/\/ URL with a host/);
+    assert.equal(await pathExists(binary), false);
+  }
+});
+
+test("the CLI installer says so when HAMSTER_INSTALL_DIR can't be written", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only directory");
+    return;
+  }
+  const { home, invoke } = await runInstaller();
+  const lockedDir = path.join(home, "locked");
+  await mkdir(lockedDir, { recursive: true });
+  await chmod(lockedDir, 0o555);
+  const result = await invoke({ HAMSTER_INSTALL_DIR: lockedDir });
+  await chmod(lockedDir, 0o755);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /\[ERROR\] Could not write to .*locked\. Make it writable, or set HAMSTER_INSTALL_DIR/);
 });
 
 test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {
