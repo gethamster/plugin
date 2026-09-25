@@ -567,7 +567,7 @@ exit 0
 // Runs the real installer against a fake release: a stub `curl` serves a
 // tarball and its checksum from `release/`, and a stub `rm` refuses the
 // legacy /usr/local/bin/hamster path so a test can never delete a real binary.
-async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true } = {}) {
+async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true, extraEnv = {} } = {}) {
   const root = await makeTemp("hamster-installer-");
   const home = path.join(root, "home");
   const stubs = path.join(root, "stubs");
@@ -604,6 +604,7 @@ case "$url" in
   *) src="${release}/archive.tar.gz" ;;
 esac
 [ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
+echo "$url" >>"${release}/requested"
 cp "$src" "$out"
 `
   );
@@ -626,8 +627,14 @@ exec /bin/rm "$@"
   }
 
   const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${stubs}${path.delimiter}${process.env.PATH ?? ""}` };
-  const invoke = () => run("bash", [INSTALLER_SCRIPT], { cwd: repoRoot, env });
-  return { home, configPath, invoke, binary: path.join(home, ".hamster", "bin", "hamster") };
+  // Clear the overrides so a runner's own VERSION or HAMSTER_* never leaks in.
+  for (const name of ["VERSION", "HAMSTER_VERSION", "HAMSTER_INSTALL_DIR", "HAMSTER_URL"]) {
+    delete env[name];
+  }
+  Object.assign(env, extraEnv);
+  const invoke = (more = {}) => run("bash", [INSTALLER_SCRIPT], { cwd: repoRoot, env: { ...env, ...more } });
+  const requested = async () => (await readFile(path.join(release, "requested"), "utf8")).trim().split("\n");
+  return { home, configPath, invoke, requested, binary: path.join(home, ".hamster", "bin", "hamster") };
 }
 
 for (const checksum of ["wrong", "empty", "missing"]) {
@@ -698,6 +705,39 @@ test("the CLI installer says so when it cannot write config.yaml", async (t) => 
   assert.equal(result.code, 1);
   assert.match(result.stderr, /\[ERROR\] Could not write .*config\.yaml, so the CLI is installed but not pointed at Hamster/);
   assert.equal(await pathExists(binary), true);
+});
+
+test("the CLI installer honors HAMSTER_VERSION, HAMSTER_INSTALL_DIR and HAMSTER_URL", async () => {
+  const { home, configPath, invoke, requested } = await runInstaller({
+    extraEnv: { HAMSTER_VERSION: "v1.2.3", HAMSTER_URL: "https://staging.example.com" },
+  });
+  const customDir = path.join(home, "tools", "bin");
+  const result = await invoke({ HAMSTER_INSTALL_DIR: customDir });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(await pathExists(path.join(customDir, "hamster")), true);
+  const urls = await requested();
+  assert.equal(urls.length, 2);
+  for (const url of urls) {
+    assert.match(url, /^https:\/\/github\.com\/gethamster\/plugin\/releases\/download\/v1\.2\.3\/hamster-/);
+  }
+  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://staging.example.com"\n');
+  assert.match(result.stderr, /Custom install dir: make sure .* is on your PATH/);
+  assert.doesNotMatch(await readFile(path.join(home, ".bashrc"), "utf8"), /\.hamster\/bin/);
+});
+
+test("the CLI installer reads the older VERSION variable too", async () => {
+  const { invoke, requested } = await runInstaller({ extraEnv: { VERSION: "v0.9.0" } });
+  const result = await invoke();
+  assert.equal(result.code, 0, result.stderr);
+  assert.match((await requested())[0], /\/releases\/download\/v0\.9\.0\//);
+});
+
+test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {
+  const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: 'https://x.example.com/"quoted' } });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /HAMSTER_URL must not contain spaces, quotes, or backslashes/);
+  assert.equal(await pathExists(binary), false);
 });
 
 test("the CLI installer stops without touching a config.yaml it cannot read", async (t) => {
