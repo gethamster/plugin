@@ -767,7 +767,24 @@ test("the CLI installer says so when HAMSTER_INSTALL_DIR can't be written", asyn
   const result = await invoke({ HAMSTER_INSTALL_DIR: lockedDir });
   await chmod(lockedDir, 0o755);
   assert.equal(result.code, 1);
-  assert.match(result.stderr, /\[ERROR\] Could not write to .*locked\. Make it writable, or set HAMSTER_INSTALL_DIR/);
+  assert.match(result.stderr, /\[ERROR\] Could not write to .*locked \(the reason is above\)\..* set HAMSTER_INSTALL_DIR/);
+});
+
+test("a read-only shell rc file is a warning, and the install still finishes", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only file");
+    return;
+  }
+  const { home, configPath, invoke, binary } = await runInstaller();
+  const bashrc = path.join(home, ".bashrc");
+  await chmod(bashrc, 0o444);
+  const result = await invoke();
+  await chmod(bashrc, 0o644);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add alias ham='hamster' to it by hand/);
+  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
+  assert.equal(await pathExists(binary), true);
+  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
 });
 
 test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {

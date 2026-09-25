@@ -24,10 +24,11 @@
 #   HAMSTER_URL          The Hamster server the CLI talks to, written to
 #                        api_url. Default: https://tryhamster.com.
 #
-# Every failure stops with an [ERROR] line that gives the reason, except that
-# a stale alias the installer can't rewrite is a [WARN] with the fix to make by
-# hand. A failed download, a checksum mismatch, or an unexpected archive also
-# gives the manual install steps.
+# Every failure stops with an [ERROR] line that gives the reason. Shell and
+# cleanup edits the installer can't make (a line in ~/.zshrc or ~/.bashrc, a
+# stale task-master alias, a legacy binary in /usr/local/bin) are a [WARN] with
+# the fix to make by hand, and the install continues. A failed download, a checksum mismatch, or an unexpected archive
+# also gives the manual install steps.
 set -euo pipefail
 
 REPO="gethamster/plugin"
@@ -110,10 +111,10 @@ tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manua
 # Stage next to the destination and rename, so the swap is atomic and lands on
 # a fresh inode: macOS kills an executable whose inode was rewritten in place.
 mkdir -p "$INSTALL_DIR" || fail "Could not create $INSTALL_DIR (the reason is above). Fix that path, or set HAMSTER_INSTALL_DIR to a directory you own."
-cannot_install="Could not write to $INSTALL_DIR. Make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
-mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new" 2>/dev/null || fail "$cannot_install"
+cannot_install="Could not write to $INSTALL_DIR (the reason is above). Free space there or make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
+mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
 chmod +x "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
-mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY" 2>/dev/null || fail "$cannot_install"
+mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY" || fail "$cannot_install"
 info "Installed $INSTALL_DIR/$BINARY"
 
 # A root-installed binary from the old sudo installer would shadow this one for
@@ -148,23 +149,34 @@ update_rc() {
     rm -f "$rc.hamster-bak"
   done
   if ! grep -qF "alias ham='hamster'" "$rc"; then
-    printf "alias ham='hamster'\n" 2>/dev/null >>"$rc" || fail "Could not write $rc. Add alias ham='hamster' to it by hand, or make it writable."
-    info "Added 'ham' alias in $rc"
+    if printf "alias ham='hamster'\n" 2>/dev/null >>"$rc"; then
+      info "Added 'ham' alias in $rc"
+    else
+      warn "Could not write $rc. Add alias ham='hamster' to it by hand."
+    fi
   fi
   if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ] && ! grep -qF '.hamster/bin' "$rc"; then
     # shellcheck disable=SC2016 # $HOME and $PATH expand when the rc file runs.
-    printf '\n# Added by the Hamster CLI installer\nexport PATH="$HOME/.hamster/bin:$PATH"\n' 2>/dev/null >>"$rc" ||
-      fail "Could not write $rc. Add $INSTALL_DIR to PATH in it by hand, or make it writable."
-    info "Added $INSTALL_DIR to PATH in $rc"
-    path_updated=true
+    if printf '\n# Added by the Hamster CLI installer\nexport PATH="$HOME/.hamster/bin:$PATH"\n' 2>/dev/null >>"$rc"; then
+      info "Added $INSTALL_DIR to PATH in $rc"
+      path_updated=true
+    else
+      warn "Could not write $rc. Add export PATH=\"\$HOME/.hamster/bin:\$PATH\" to it by hand."
+    fi
   fi
 }
 
 # Make sure the login shell's rc file exists so the PATH entry has somewhere to land.
 case "${SHELL:-}" in
-  */zsh) touch "$HOME/.zshrc" 2>/dev/null || fail "Could not create $HOME/.zshrc. Add $INSTALL_DIR to PATH by hand." ;;
-  */bash) touch "$HOME/.bashrc" 2>/dev/null || fail "Could not create $HOME/.bashrc. Add $INSTALL_DIR to PATH by hand." ;;
+  */zsh) rc_file="$HOME/.zshrc" ;;
+  */bash) rc_file="$HOME/.bashrc" ;;
+  *) rc_file="" ;;
 esac
+# Only create a missing file: touching one that is read-only, such as a
+# home-manager symlink into the nix store, would fail for no reason.
+if [ -n "$rc_file" ] && [ ! -e "$rc_file" ] && ! touch "$rc_file" 2>/dev/null; then
+  warn "Could not create $rc_file. Add $INSTALL_DIR to PATH in your shell's startup file by hand."
+fi
 update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
 if [ "$INSTALL_DIR" != "$DEFAULT_INSTALL_DIR" ]; then
@@ -203,7 +215,7 @@ if [ -f "$config" ]; then
     rm -f "$config.tmp"
     fail "Could not read $config, so it was left unchanged. Set api_url: \"$API_URL\" in it by hand."
   fi
-  mv "$config.tmp" "$config" 2>/dev/null || fail "$cannot_write"
+  mv "$config.tmp" "$config" || fail "$cannot_write"
 fi
 printf 'api_url: "%s"\n' "$API_URL" 2>/dev/null >>"$config" || fail "$cannot_write"
 
