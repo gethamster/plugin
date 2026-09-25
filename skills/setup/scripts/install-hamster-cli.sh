@@ -12,8 +12,8 @@
 # Deliberate differences from the hosted script, to keep when carrying its
 # changes over: the checksum is required (the hosted script skips a missing
 # one); there are no VERSION or HAMSTER_INSTALL_DIR overrides; indented stale
-# aliases are commented out too; a config.yaml that can't be read, or a binary
-# that won't run, stops the install with the reason; an alias that can't be
+# aliases are commented out too; a config.yaml that can't be read or written,
+# or a binary that won't run, stops the install with the reason; an alias that can't be
 # rewritten is reported with the fix to make by hand; and a failed download,
 # checksum mismatch, or unexpected archive ends with the manual install steps.
 #
@@ -143,7 +143,11 @@ if [ "$code" -ne 0 ]; then
 fi
 
 config="$HOME/.hamster/config.yaml"
+cannot_write="Could not write $config, so the CLI is installed but not pointed at Hamster. Make $HOME/.hamster writable, or set api_url: \"https://tryhamster.com\" in $config by hand."
 if [ -f "$config" ]; then
+  # A failed redirect also exits 1, like grep with no lines left, so check
+  # that the temp file can be written before trusting grep's status.
+  : 2>/dev/null >"$config.tmp" || fail "$cannot_write"
   # grep exits 1 when every line was api_url, which is fine; anything above 1
   # means config.yaml could not be read, so leave it untouched.
   status=0
@@ -152,8 +156,8 @@ if [ -f "$config" ]; then
     rm -f "$config.tmp"
     fail "Could not read $config, so it was left unchanged. Set api_url: \"https://tryhamster.com\" in it by hand."
   fi
-  mv "$config.tmp" "$config"
+  mv "$config.tmp" "$config" 2>/dev/null || fail "$cannot_write"
 fi
-printf 'api_url: "https://tryhamster.com"\n' >>"$config"
+printf 'api_url: "https://tryhamster.com"\n' 2>/dev/null >>"$config" || fail "$cannot_write"
 
 info "Hamster CLI installed: $version"

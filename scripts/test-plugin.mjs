@@ -684,6 +684,22 @@ test("the CLI installer verifies, installs, and edits shell and CLI config once"
   assert.equal(bashrc.match(/^alias ham='hamster'$/gm)?.length, 1);
 });
 
+test("the CLI installer says so when it cannot write config.yaml", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can write a read-only directory");
+    return;
+  }
+  const { home, invoke, binary } = await runInstaller();
+  const hamsterDir = path.join(home, ".hamster");
+  await mkdir(path.join(hamsterDir, "bin"), { recursive: true });
+  await chmod(hamsterDir, 0o555);
+  const result = await invoke();
+  await chmod(hamsterDir, 0o755);
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /\[ERROR\] Could not write .*config\.yaml, so the CLI is installed but not pointed at Hamster/);
+  assert.equal(await pathExists(binary), true);
+});
+
 test("the CLI installer stops without touching a config.yaml it cannot read", async (t) => {
   if (process.getuid?.() === 0) {
     t.skip("root can read a mode 000 file");
