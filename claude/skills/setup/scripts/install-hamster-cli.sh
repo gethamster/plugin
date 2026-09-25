@@ -27,8 +27,9 @@
 # Every failure stops with an [ERROR] line that gives the reason. Shell and
 # cleanup edits the installer can't make (a line in ~/.zshrc or ~/.bashrc, a
 # stale task-master alias, a legacy binary in /usr/local/bin) are a [WARN] with
-# the fix to make by hand, and the install continues. A failed download, a checksum mismatch, or an unexpected archive
-# also gives the manual install steps.
+# the fix to make by hand, and the install continues. A failed download, a
+# checksum mismatch, or an unexpected archive also gives the manual install
+# steps.
 set -euo pipefail
 
 REPO="gethamster/plugin"
@@ -179,6 +180,11 @@ if [ -n "$rc_file" ] && [ ! -e "$rc_file" ] && ! touch "$rc_file" 2>/dev/null; t
 fi
 update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
+# A login shell other than bash or zsh (fish, nushell) has neither file, so say
+# so rather than finish with hamster off PATH.
+if [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ] && ! grep -qsF '.hamster/bin' "$HOME/.zshrc" "$HOME/.bashrc"; then
+  warn "No ~/.zshrc or ~/.bashrc to update. Add $INSTALL_DIR to PATH in your shell's startup file by hand."
+fi
 if [ "$INSTALL_DIR" != "$DEFAULT_INSTALL_DIR" ]; then
   warn "Custom install dir: make sure $INSTALL_DIR is on your PATH."
 fi
@@ -201,12 +207,12 @@ fi
 
 config_dir="$HOME/.hamster"
 config="$config_dir/config.yaml"
-cannot_write="Could not write $config, so the CLI is installed but not pointed at Hamster. Make $config_dir writable, or set api_url: \"$API_URL\" in $config by hand."
+cannot_write="Could not write $config (the reason is above), so the CLI is installed but not pointed at Hamster. Fix that, or set api_url: \"$API_URL\" in $config by hand."
 mkdir -p "$config_dir" || fail "Could not create $config_dir (the reason is above), so the CLI is installed but not pointed at Hamster. Fix that path, then set api_url: \"$API_URL\" in $config by hand."
 if [ -f "$config" ]; then
   # A failed redirect also exits 1, like grep with no lines left, so check
   # that the temp file can be written before trusting grep's status.
-  : 2>/dev/null >"$config.tmp" || fail "$cannot_write"
+  : >"$config.tmp" || fail "$cannot_write"
   # grep exits 1 when every line was api_url, which is fine; anything above 1
   # means config.yaml could not be read, so leave it untouched.
   status=0
@@ -217,7 +223,7 @@ if [ -f "$config" ]; then
   fi
   mv "$config.tmp" "$config" || fail "$cannot_write"
 fi
-printf 'api_url: "%s"\n' "$API_URL" 2>/dev/null >>"$config" || fail "$cannot_write"
+printf 'api_url: "%s"\n' "$API_URL" >>"$config" || fail "$cannot_write"
 
 info "Hamster CLI installed: $version"
 info "Configured API URL: $API_URL"
