@@ -778,10 +778,13 @@ test("a read-only shell rc file is a warning, and the install still finishes", a
   const { home, configPath, invoke, binary } = await runInstaller();
   const bashrc = path.join(home, ".bashrc");
   await chmod(bashrc, 0o444);
+  // .zshrc takes the PATH line, but bash, the login shell, reads .bashrc.
+  await writeFile(path.join(home, ".zshrc"), "");
   const result = await invoke();
   await chmod(bashrc, 0o644);
   assert.equal(result.code, 0, result.stderr);
   assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
+  assert.doesNotMatch(result.stdout, /Restart your shell/);
   assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add alias ham='hamster' to it by hand/);
   assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
   assert.equal(await pathExists(binary), true);

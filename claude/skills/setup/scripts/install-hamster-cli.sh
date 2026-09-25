@@ -227,7 +227,9 @@ printf 'api_url: "%s"\n' "$API_URL" >>"$config" || fail "$cannot_write"
 
 info "Hamster CLI installed: $version"
 info "Configured API URL: $API_URL"
-if [ "$path_updated" = true ] && [ -n "$rc_file" ]; then
+# Only when the login shell's own file got the line; otherwise the [WARN]
+# above is the instruction to follow.
+if [ "$path_updated" = true ] && [ -n "$rc_file" ] && grep -qsF '.hamster/bin' "$rc_file"; then
   info "Restart your shell (or run: source $rc_file) to pick up the PATH change."
 fi
 cat <<'EOF'
