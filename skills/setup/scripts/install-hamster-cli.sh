@@ -8,6 +8,11 @@
 # does what the hosted installer does: put ~/.hamster/bin on PATH in ~/.zshrc
 # and ~/.bashrc, retire stale task-master aliases, add the `ham` alias, and
 # point the CLI at https://tryhamster.com.
+#
+# Mirrors the hosted script with this SHA-256. CI fetches the hosted script and
+# fails when its hash changes, so a change there gets carried over here before
+# this pin is updated:
+# hosted-installer-sha256: 4771367e627ba757b01e5e40374d5745da2cd93591b2e1bec737766f13c3ef7a
 set -euo pipefail
 
 REPO="gethamster/plugin"

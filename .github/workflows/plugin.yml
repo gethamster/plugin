@@ -33,6 +33,32 @@ jobs:
           name: codex-skills-only-bundle-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/*.zip
 
+  # The setup skill runs a readable copy of https://tryhamster.com/cli/install,
+  # which is served from the studio repo. This fails when the hosted script's
+  # bytes stop matching the hash pinned in the copy, so a new platform, URL, or
+  # config step there is carried over here. It is kept out of validate so a
+  # website deploy never holds up a plugin version tag.
+  installer-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the hosted CLI installer with the bundled copy's pin
+        run: |
+          set -euo pipefail
+          copy=skills/setup/scripts/install-hamster-cli.sh
+          pinned="$(sed -n 's/^# hosted-installer-sha256: \([0-9a-f]\{64\}\)$/\1/p' "$copy")"
+          if [ -z "$pinned" ]; then
+            echo "$copy has no hosted-installer-sha256 pin." >&2
+            exit 1
+          fi
+          live="$(curl -fsSL https://tryhamster.com/cli/install | sha256sum | cut -d' ' -f1)"
+          if [ "$live" != "$pinned" ]; then
+            echo "https://tryhamster.com/cli/install changed (sha256 $live, pinned $pinned)." >&2
+            echo "Carry its changes into $copy, update the pin, and run node scripts/sync-adapters.mjs." >&2
+            exit 1
+          fi
+          echo "Hosted installer matches the pin in $copy."
+
   # Bumping "version" in the root plugin.json on main publishes plugin-v<version>,
   # so an install can pin an exact plugin version. Published tags are never
   # deleted or moved.
