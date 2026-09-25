@@ -44,10 +44,14 @@ async function makeTemp(prefix) {
   return dir;
 }
 
-function run(command, args, options) {
+// Only cwd and env are passed through, and never through a shell, so no path
+// or environment value in a fixture is interpreted as shell syntax.
+function run(command, args, { cwd, env } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      ...options,
+      cwd,
+      env,
+      shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
