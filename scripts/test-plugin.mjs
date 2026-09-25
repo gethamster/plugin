@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -175,6 +175,65 @@ test("a skill edit not synced into claude/ fails validation", async () => {
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /claude\/skills\/qa\/SKILL\.md is out of sync with skills\/qa\/SKILL\.md/);
   assert.match(result.stderr, /claude\/skills\/qa\/notes\.md has no source at the repository root/);
+});
+
+test("a symlink inside claude/ fails validation even when it reads like its source", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-link-");
+  await copyPackage(cwd);
+  await unlink(path.join(cwd, "claude", ".mcp.json"));
+  await symlink("../.mcp.json", path.join(cwd, "claude", ".mcp.json"));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /claude\/\.mcp\.json is a symbolic link; claude\/ must hold regular files/);
+});
+
+test("syncing claude/ copies edits, drops orphans and links, and keeps its README", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-sync-");
+  await copyPackage(cwd);
+  const readmePath = path.join(cwd, "claude", "README.md");
+  const readme = await readFile(readmePath);
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
+  await writeFile(path.join(cwd, "claude", "skills", "qa", "notes.md"), "Only in claude/.\n");
+  await unlink(path.join(cwd, "claude", "LICENSE"));
+  await symlink("../LICENSE", path.join(cwd, "claude", "LICENSE"));
+
+  const sync = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs")], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.deepEqual(await readFile(readmePath), readme);
+  assert.deepEqual(await readFile(path.join(cwd, "claude", "skills", "qa", "SKILL.md")), await readFile(skillPath));
+  assert.equal(await pathExists(path.join(cwd, "claude", "skills", "qa", "notes.md")), false);
+  assert.equal((await lstat(path.join(cwd, "claude", "LICENSE"))).isFile(), true);
+
+  const check = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs"), "--check"], { cwd });
+  assert.equal(check.code, 0, check.stderr);
+});
+
+test("a Claude marketplace that installs from the repository root fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-source-");
+  await copyPackage(cwd);
+  const marketplacePath = path.join(cwd, ".claude-plugin", "marketplace.json");
+  const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+  marketplace.plugins[0].source = "./";
+  await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Claude marketplace\.json plugins\[0\]\.source must be "\.\/claude"/);
+});
+
+test("a Copilot marketplace version that drifts fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-copilot-version-");
+  await copyPackage(cwd);
+  const marketplacePath = path.join(cwd, ".github", "plugin", "marketplace.json");
+  const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+  marketplace.plugins[0].version = "0.0.1";
+  await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Copilot marketplace\.json plugins\[0\] version "0\.0\.1" does not match root/);
 });
 
 test("a missing referenced path fails validation", async () => {
@@ -426,4 +485,113 @@ exit 0
   assert.equal(result.code, 1);
   assert.equal(result.stdout.trim(), "SETUP_NEEDED");
   assert.match(result.stderr, /status failed: not logged in/);
+});
+
+const installerScript = path.join(repoRoot, "skills", "setup", "scripts", "install-hamster-cli.sh");
+
+// Runs the real installer against a fake release: a stub `curl` serves a
+// tarball and its checksum from `release/`, and a stub `rm` refuses the
+// legacy /usr/local/bin/hamster path so a test can never delete a real binary.
+async function runInstaller({ checksum = "match", config = null, rc = "" } = {}) {
+  const root = await makeTemp("hamster-installer-");
+  const home = path.join(root, "home");
+  const stubs = path.join(root, "stubs");
+  const release = path.join(root, "release");
+  await mkdir(home, { recursive: true });
+  await mkdir(stubs, { recursive: true });
+  await mkdir(path.join(release, "pkg"), { recursive: true });
+
+  await writeFile(path.join(release, "pkg", "hamster"), "#!/usr/bin/env bash\necho 'hamster version v0.0.0-test'\n");
+  await chmod(path.join(release, "pkg", "hamster"), 0o755);
+  const tar = await run("tar", ["-czf", path.join(release, "archive.tar.gz"), "-C", path.join(release, "pkg"), "hamster"]);
+  assert.equal(tar.code, 0, tar.stderr);
+  const digest = createHash("sha256").update(await readFile(path.join(release, "archive.tar.gz"))).digest("hex");
+  if (checksum === "match") {
+    await writeFile(path.join(release, "archive.sha256"), `${digest}  archive.tar.gz\n`);
+  } else if (checksum === "wrong") {
+    await writeFile(path.join(release, "archive.sha256"), `${"0".repeat(64)}  archive.tar.gz\n`);
+  } else if (checksum === "empty") {
+    await writeFile(path.join(release, "archive.sha256"), "");
+  }
+
+  await writeFile(
+    path.join(stubs, "curl"),
+    `#!/usr/bin/env bash
+url=""; out=""
+while [ $# -gt 0 ]; do
+  case "$1" in -o) out="$2"; shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac
+done
+case "$url" in
+  *.sha256) src="${release}/archive.sha256" ;;
+  *) src="${release}/archive.tar.gz" ;;
+esac
+[ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
+cp "$src" "$out"
+`
+  );
+  await writeFile(
+    path.join(stubs, "rm"),
+    `#!/usr/bin/env bash
+for arg in "$@"; do [ "$arg" = /usr/local/bin/hamster ] && exit 1; done
+exec /bin/rm "$@"
+`
+  );
+  await chmod(path.join(stubs, "curl"), 0o755);
+  await chmod(path.join(stubs, "rm"), 0o755);
+
+  await writeFile(path.join(home, ".bashrc"), rc);
+  const configPath = path.join(home, ".hamster", "config.yaml");
+  if (config !== null) {
+    await mkdir(path.dirname(configPath), { recursive: true });
+    await writeFile(configPath, config.text);
+    await chmod(configPath, config.mode ?? 0o644);
+  }
+
+  const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${stubs}${path.delimiter}${process.env.PATH ?? ""}` };
+  const invoke = () => run("bash", [installerScript], { env });
+  return { home, configPath, invoke, binary: path.join(home, ".hamster", "bin", "hamster") };
+}
+
+for (const checksum of ["wrong", "empty", "missing"]) {
+  test(`the CLI installer refuses a ${checksum} checksum and installs nothing`, async () => {
+    const { invoke, binary } = await runInstaller({ checksum });
+    const result = await invoke();
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, checksum === "missing" ? /Failed to download the checksum/ : /Checksum mismatch/);
+    assert.equal(await pathExists(binary), false);
+  });
+}
+
+test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {
+  const { home, configPath, invoke, binary } = await runInstaller({
+    config: { text: "profile: work\napi_url: http://old.example\n" },
+    rc: "if true; then\n  alias hamster='task-master'\nfi\n",
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const result = await invoke();
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /Checksum verified/);
+  }
+
+  assert.equal(await pathExists(binary), true);
+  assert.equal(await readFile(configPath, "utf8"), 'profile: work\napi_url: "https://tryhamster.com"\n');
+  const bashrc = await readFile(path.join(home, ".bashrc"), "utf8");
+  assert.match(bashrc, /^ {2}# alias hamster='task-master'/m);
+  assert.doesNotMatch(bashrc, /^\s*alias hamster='task-master'/m);
+  assert.equal(bashrc.match(/\.hamster\/bin:\$PATH/g)?.length, 1);
+  assert.equal(bashrc.match(/^alias ham='hamster'$/gm)?.length, 1);
+});
+
+test("the CLI installer stops without touching a config.yaml it cannot read", async (t) => {
+  if (process.getuid?.() === 0) {
+    t.skip("root can read a mode 000 file");
+    return;
+  }
+  const { configPath, invoke } = await runInstaller({ config: { text: "profile: work\n", mode: 0o000 } });
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Could not read .*config\.yaml, so it was left unchanged/);
+  await chmod(configPath, 0o644);
+  assert.equal(await readFile(configPath, "utf8"), "profile: work\n");
 });

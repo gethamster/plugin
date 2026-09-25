@@ -9,6 +9,12 @@
 # and ~/.bashrc, retire stale task-master aliases, add the `ham` alias, and
 # point the CLI at https://tryhamster.com.
 #
+# Deliberate differences from the hosted script, to keep when carrying its
+# changes over: the checksum is required (the hosted script skips a missing
+# one), there are no VERSION or HAMSTER_INSTALL_DIR overrides, and a failure to
+# read config.yaml, comment out an alias, or run the new binary stops with the
+# reason instead of passing silently.
+#
 # Mirrors the hosted script with this SHA-256. CI fetches the hosted script and
 # fails when its hash changes, so a change there gets carried over here before
 # this pin is updated:
@@ -86,14 +92,16 @@ update_rc() {
   [ -f "$rc" ] || return 0
   local stale
   for stale in "alias hamster='task-master'" "alias ham='task-master'"; do
-    if grep -qF "$stale" "$rc"; then
-      if sed -i.hamster-bak "s|^${stale}|# ${stale}  # commented out — hamster/ham now owned by Hamster CLI|" "$rc"; then
-        rm -f "$rc.hamster-bak"
-        warn "Commented out stale task-master alias in $rc"
-      else
-        warn "Could not update $rc"
-      fi
+    # Indented aliases count too; lines already commented out do not.
+    grep -qE "^[[:space:]]*${stale}" "$rc" || continue
+    if ! sed -i.hamster-bak -E "s|^([[:space:]]*)(${stale})|\\1# \\2  # commented out — hamster/ham now owned by Hamster CLI|" "$rc"; then
+      warn "Could not update $rc. Remove $stale from it by hand."
+    elif cmp -s "$rc" "$rc.hamster-bak"; then
+      warn "Found $stale in $rc but could not comment it out. Remove it by hand."
+    else
+      warn "Commented out stale task-master alias in $rc"
     fi
+    rm -f "$rc.hamster-bak"
   done
   if ! grep -qF "alias ham='hamster'" "$rc"; then
     printf "alias ham='hamster'\n" >>"$rc"
@@ -114,12 +122,20 @@ esac
 update_rc "$HOME/.zshrc"
 update_rc "$HOME/.bashrc"
 
-version="$("$INSTALL_DIR/$BINARY" --version 2>/dev/null)" ||
-  fail "Installed $INSTALL_DIR/$BINARY but it failed to run"
+version_err="$work/version.err"
+version="$("$INSTALL_DIR/$BINARY" --version 2>"$version_err")" ||
+  fail "Installed $INSTALL_DIR/$BINARY but it failed to run: $(cat "$version_err")"
 
 config="$HOME/.hamster/config.yaml"
 if [ -f "$config" ]; then
-  grep -v '^api_url:' "$config" >"$config.tmp" || true
+  # grep exits 1 when every line was api_url, which is fine; anything above 1
+  # means config.yaml could not be read, so leave it untouched.
+  status=0
+  grep -v '^api_url:' "$config" >"$config.tmp" || status=$?
+  if [ "$status" -gt 1 ]; then
+    rm -f "$config.tmp"
+    fail "Could not read $config, so it was left unchanged. Set api_url: \"https://tryhamster.com\" in it by hand."
+  fi
   mv "$config.tmp" "$config"
 fi
 printf 'api_url: "https://tryhamster.com"\n' >>"$config"

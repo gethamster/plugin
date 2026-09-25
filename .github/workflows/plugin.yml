@@ -35,8 +35,9 @@ jobs:
 
   # The setup skill runs a readable copy of https://tryhamster.com/cli/install.
   # This fails when the hosted script's bytes stop matching the hash pinned in
-  # the copy, so a new platform, URL, or config step there is carried over here. It is kept out of validate so a
-  # website deploy never holds up a plugin version tag.
+  # the copy, so a new platform, URL, or config step there is carried over here.
+  # It is kept out of validate so a website deploy never holds up a plugin
+  # version tag.
   installer-mirror:
     runs-on: ubuntu-latest
     steps:
@@ -53,7 +54,7 @@ jobs:
           live="$(curl -fsSL https://tryhamster.com/cli/install | sha256sum | cut -d' ' -f1)"
           if [ "$live" != "$pinned" ]; then
             echo "https://tryhamster.com/cli/install changed (sha256 $live, pinned $pinned)." >&2
-            echo "Carry its changes into $copy, update the pin, and run node scripts/sync-adapters.mjs." >&2
+            echo "Carry its changes into $copy, keeping the differences its header lists, update the pin, and run node scripts/sync-adapters.mjs." >&2
             exit 1
           fi
           echo "Hosted installer matches the pin in $copy."

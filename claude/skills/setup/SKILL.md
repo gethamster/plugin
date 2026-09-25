@@ -36,7 +36,7 @@ If `hamster` is not on PATH (also look in `~/.hamster/bin`), run the bundled ins
 SKILL_DIR="<absolute path of the directory containing this SKILL.md>"; bash "$SKILL_DIR/scripts/install-hamster-cli.sh"
 ```
 
-It downloads the latest `hamster` release for this OS and architecture from GitHub, refuses to install unless the archive matches its published SHA256, installs to `~/.hamster/bin`, and adds that directory to PATH in `~/.zshrc` and `~/.bashrc`. If the script is not readable, or this is Windows, ask the user to download the binary for their platform from https://github.com/gethamster/plugin/releases/latest into `~/.hamster/bin`, then continue.
+It downloads the latest `hamster` release for this OS and architecture from GitHub, refuses to install unless the archive matches its published SHA256, installs to `~/.hamster/bin`. It also edits shell and CLI config, so tell the user before running it: in whichever of `~/.zshrc` and `~/.bashrc` exist (creating the login shell's) it adds `~/.hamster/bin` to PATH and a `ham` alias and comments out stale task-master aliases; it removes an old `/usr/local/bin/hamster` if it can; and it sets `api_url` in `~/.hamster/config.yaml` to `https://tryhamster.com`, replacing any existing `api_url`. If the script is not readable, or this is Windows, ask the user to download the binary for their platform from https://github.com/gethamster/plugin/releases/latest into `~/.hamster/bin`, then continue.
 
 Then put `~/.hamster/bin` on PATH for this session.
 
