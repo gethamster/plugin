@@ -8,3 +8,8 @@
 *.ps1 text eol=lf
 *.md text eol=lf
 *.json text eol=lf
+
+# claude/ is written by scripts/sync-adapters.mjs from the root files, so
+# GitHub collapses it in diffs. Edit the root copy and run the sync.
+claude/** linguist-generated=true
+claude/README.md -linguist-generated

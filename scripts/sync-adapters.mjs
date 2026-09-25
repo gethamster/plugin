@@ -176,21 +176,33 @@ async function syncClaudePackage({ check, errors, written, removed }) {
     }
   }
 
-  // The directory skips symbolic links, so a link here would be a file missing
-  // from the package even though it reads the same as its source.
+  // The Claude plugin directory skips symbolic links, so a link here would be
+  // a file missing from the package even though it reads the same as its
+  // source. Links are never read through: they leave `present` in both modes.
   const links = [];
   const present = new Set(
     (await listFiles(CLAUDE_PACKAGE_DIR, links)).map((file) => path.relative(CLAUDE_PACKAGE_DIR, file))
   );
   const rerun = "Run `node scripts/sync-adapters.mjs`.";
+  const replacedLinks = new Set();
 
   for (const link of links) {
+    const file = path.relative(CLAUDE_PACKAGE_DIR, link);
+    if (CLAUDE_PACKAGE_OWN_FILES.has(file)) {
+      // Written by hand, so the sync can't regenerate it; never delete it.
+      errors.push(`${link} is a symbolic link; replace it with a regular file. It is written by hand, not generated.`);
+      continue;
+    }
+    present.delete(file);
     if (check) {
       errors.push(`${link} is a symbolic link; claude/ must hold regular files. ${rerun}`);
+      continue;
+    }
+    await fs.rm(path.join(repoRoot, link));
+    if (expected.has(file)) {
+      replacedLinks.add(link);
     } else {
-      await fs.rm(path.join(repoRoot, link));
       removed.push(link);
-      present.delete(path.relative(CLAUDE_PACKAGE_DIR, link));
     }
   }
 
@@ -201,12 +213,12 @@ async function syncClaudePackage({ check, errors, written, removed }) {
   }
 
   for (const file of present) {
-    const target = path.join(CLAUDE_PACKAGE_DIR, file);
-    if (expected.has(file) || CLAUDE_PACKAGE_OWN_FILES.has(file) || links.includes(target)) {
+    if (expected.has(file) || CLAUDE_PACKAGE_OWN_FILES.has(file)) {
       continue;
     }
+    const target = path.join(CLAUDE_PACKAGE_DIR, file);
     if (check) {
-      errors.push(`${target} has no source at the repository root. ${rerun}`);
+      errors.push(`${target} has no source at the repository root. Add it at the root instead, then ${rerun.toLowerCase()}`);
     } else {
       await fs.rm(path.join(repoRoot, target));
       removed.push(target);
@@ -215,29 +227,48 @@ async function syncClaudePackage({ check, errors, written, removed }) {
 
   for (const file of expected) {
     const target = path.join(CLAUDE_PACKAGE_DIR, file);
-    const sourceBytes = await fs.readFile(path.join(repoRoot, file));
-    let targetBytes = null;
+    const sourcePath = path.join(repoRoot, file);
+    const targetPath = path.join(repoRoot, target);
+    const sourceBytes = await fs.readFile(sourcePath);
+    // The installer and the ensure-ready scripts must stay executable.
+    const sourceMode = (await fs.stat(sourcePath)).mode & 0o777;
+    let difference = "missing";
     if (present.has(file)) {
-      targetBytes = await fs.readFile(path.join(repoRoot, target));
-    }
-    if (targetBytes !== null && sourceBytes.equals(targetBytes)) {
-      continue;
+      const sameBytes = sourceBytes.equals(await fs.readFile(targetPath));
+      const sameExec = ((await fs.stat(targetPath)).mode & 0o111) === (sourceMode & 0o111);
+      if (sameBytes && sameExec) {
+        continue;
+      }
+      difference = sameBytes ? "executable bit" : "content";
     }
     if (check) {
-      errors.push(
-        targetBytes === null ? `${target} is missing. ${rerun}` : `${target} is out of sync with ${file}. ${rerun}`
-      );
+      if (difference === "missing") {
+        errors.push(`${target} is missing. ${rerun}`);
+      } else {
+        errors.push(
+          `${target} differs from ${file} (${difference}). claude/ is generated: make the change in ${file}, then ${rerun.toLowerCase()} A sync overwrites edits made only in claude/.`
+        );
+      }
       continue;
     }
-    await fs.mkdir(path.dirname(path.join(repoRoot, target)), { recursive: true });
-    await fs.copyFile(path.join(repoRoot, file), path.join(repoRoot, target));
-    written.push(target);
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.copyFile(sourcePath, targetPath);
+    await fs.chmod(targetPath, sourceMode);
+    written.push(replacedLinks.has(target) ? `${target} (replaced a symbolic link)` : target);
   }
 }
 
 async function main() {
   const check = process.argv.includes("--check");
   const { errors, written, removed } = await syncAdapters({ check });
+
+  // Report what a sync already changed even when it then fails.
+  for (const file of written) {
+    console.log(`Wrote ${file}`);
+  }
+  for (const file of removed) {
+    console.log(`Removed ${file}`);
+  }
 
   if (errors.length > 0) {
     console.error(check ? "Adapter check failed:" : "Adapter sync failed:");
@@ -249,14 +280,6 @@ async function main() {
 
   if (check) {
     console.log("Adapter check passed.");
-    return;
-  }
-
-  for (const file of written) {
-    console.log(`Wrote ${file}`);
-  }
-  for (const file of removed) {
-    console.log(`Removed ${file}`);
   }
 }
 

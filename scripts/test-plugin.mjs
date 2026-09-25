@@ -173,19 +173,51 @@ test("a skill edit not synced into claude/ fails validation", async () => {
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /claude\/skills\/qa\/SKILL\.md is out of sync with skills\/qa\/SKILL\.md/);
+  assert.match(
+    result.stderr,
+    /claude\/skills\/qa\/SKILL\.md differs from skills\/qa\/SKILL\.md \(content\)\. claude\/ is generated: make the change in skills\/qa\/SKILL\.md/
+  );
   assert.match(result.stderr, /claude\/skills\/qa\/notes\.md has no source at the repository root/);
 });
 
-test("a symlink inside claude/ fails validation even when it reads like its source", async () => {
+test("symlinks inside claude/ fail validation, dangling or not, and are never followed", async () => {
   const cwd = await makeTemp("hamster-plugin-claude-link-");
   await copyPackage(cwd);
   await unlink(path.join(cwd, "claude", ".mcp.json"));
   await symlink("../.mcp.json", path.join(cwd, "claude", ".mcp.json"));
+  await unlink(path.join(cwd, "claude", "LICENSE"));
+  await symlink("../NOPE", path.join(cwd, "claude", "LICENSE"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /claude\/\.mcp\.json is a symbolic link; claude\/ must hold regular files/);
+  assert.match(result.stderr, /claude\/LICENSE is a symbolic link; claude\/ must hold regular files/);
+  assert.doesNotMatch(result.stderr, /ENOENT/);
+});
+
+test("a claude/ copy that loses its executable bit fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-mode-");
+  await copyPackage(cwd);
+  await chmod(path.join(cwd, "claude", "skills", "setup", "scripts", "install-hamster-cli.sh"), 0o644);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(
+    result.stderr,
+    /claude\/skills\/setup\/scripts\/install-hamster-cli\.sh differs from skills\/setup\/scripts\/install-hamster-cli\.sh \(executable bit\)/
+  );
+});
+
+test("syncing never deletes a symlinked claude/README.md, which it cannot regenerate", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-readme-link-");
+  await copyPackage(cwd);
+  await unlink(path.join(cwd, "claude", "README.md"));
+  await symlink("../README.md", path.join(cwd, "claude", "README.md"));
+
+  const sync = await run(process.execPath, [path.join(repoRoot, "scripts", "sync-adapters.mjs")], { cwd });
+  assert.equal(sync.code, 1);
+  assert.match(sync.stderr, /claude\/README\.md is a symbolic link; replace it with a regular file/);
+  assert.equal((await lstat(path.join(cwd, "claude", "README.md"))).isSymbolicLink(), true);
 });
 
 test("syncing claude/ copies edits, drops orphans and links, and keeps its README", async () => {
