@@ -57,3 +57,17 @@ hamster init
 `init` may ask the user to pick an account and runs the first sync.
 
 Re-run the readiness check — it runs the sync that pulls the plan. If it still prints `SETUP_NEEDED`, report what failed and stop.
+
+## Finish
+
+When the check prints `READY`, confirm this repo now has `.hamster/`. If the client has the Hamster MCP server and the user has not signed in to it yet, point them to their client's sign-in; the client owns it, never handle their credentials:
+
+- Claude Code: open `/mcp` and select `plugin:hamster:hamster`.
+- Codex: run `codex mcp login hamster` in a terminal.
+- Copilot CLI: `/mcp auth hamster`.
+- Grok Build: open `/mcps`, select `hamster`, and press `i`.
+- Cursor: follow Cursor's Hamster sign-in prompt.
+- Antigravity: in the CLI, open `/mcp`, select `hamster_hamster`, then Authenticate; in the app, select Authenticate on `hamster_hamster` under Settings → Customizations → Installed MCP Servers.
+- Pi has no MCP; Hamster runs through the CLI.
+
+Then tell the user they can ask Hamster about this repo with the `ask-hamster` skill and ship a brief with `ship`.
