@@ -17,7 +17,7 @@ jobs:
           node-version: "20"
       - name: Run plugin package tests
         run: node --test scripts/test-plugin.mjs
-      - name: Check generated native agents
+      - name: Check generated native agents and the claude/ package
         run: node scripts/sync-adapters.mjs --check
       - name: Validate plugin package
         run: node scripts/validate-plugin.mjs

@@ -28,6 +28,8 @@ const PACKAGE_ENTRIES = [
   "agents",
   "assets",
   "scripts",
+  "claude",
+  ".github/plugin",
 ];
 
 const fixtures = [];
@@ -160,6 +162,19 @@ test("a non-semver root version fails validation", async () => {
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Root plugin\.json "version" must be semver-like, got "3\.4"/);
+});
+
+test("a skill edit not synced into claude/ fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-drift-");
+  await copyPackage(cwd);
+  const skillPath = path.join(cwd, "skills", "qa", "SKILL.md");
+  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nEdited at the root only.\n`);
+  await writeFile(path.join(cwd, "claude", "skills", "qa", "notes.md"), "Only in claude/.\n");
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /claude\/skills\/qa\/SKILL\.md is out of sync with skills\/qa\/SKILL\.md/);
+  assert.match(result.stderr, /claude\/skills\/qa\/notes\.md has no source at the repository root/);
 });
 
 test("a missing referenced path fails validation", async () => {
@@ -369,8 +384,11 @@ test("an uncommitted bundle source stops the build", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-dirty-");
   await copyPackage(cwd);
   await commitPackage(cwd);
-  const skillPath = path.join(cwd, "skills", "ship", "SKILL.md");
-  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+  // Edit the claude/ mirror too, so validation passes and the dirty-tree gate is what stops the build.
+  for (const root of [cwd, path.join(cwd, "claude")]) {
+    const skillPath = path.join(root, "skills", "ship", "SKILL.md");
+    await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+  }
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
