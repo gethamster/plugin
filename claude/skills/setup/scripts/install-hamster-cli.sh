@@ -3,9 +3,8 @@
 #
 # This is the Hamster CLI installer. https://tryhamster.com/cli/install
 # redirects to this file on the main branch, and the plugin's setup skill runs
-# it directly, so both install paths run the same script:
-#
-#   curl -fsSL https://tryhamster.com/cli/install | bash
+# it directly, so the tryhamster.com/cli/install one-liner and the setup skill
+# both run the same script.
 #
 # That redirect names this exact path, so moving or renaming the file breaks
 # the install URL.
