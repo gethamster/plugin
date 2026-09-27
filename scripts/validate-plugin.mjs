@@ -607,6 +607,37 @@ async function validateCodex(version) {
   return manifest.interface.category;
 }
 
+// Pi installs this as an npm or git package, and the pi.dev gallery lists npm
+// packages that carry the pi-package keyword. Its version is the plugin's: a
+// plugin bump that skips package.json tags new skills with a version npm already
+// has, so the package can't be republished and gallery installs keep old skills.
+// https://pi.dev/docs/latest/packages
+async function validatePiPackage(version) {
+  const manifest = await readJsonFile(path.join(repoRoot, "package.json"), "Pi package.json");
+  if (!manifest) {
+    return;
+  }
+
+  if (!Array.isArray(manifest.keywords) || !manifest.keywords.includes("pi-package")) {
+    addError('Pi package.json keywords must include "pi-package", or the pi.dev gallery will not list it.');
+  }
+
+  const skills = manifest.pi?.skills;
+  if (!Array.isArray(skills) || skills.length !== 1 || skills[0] !== "./skills") {
+    addError(`Pi package.json pi.skills must be ["./skills"], got ${JSON.stringify(skills)}.`);
+  }
+
+  if (!Array.isArray(manifest.files) || !manifest.files.includes("skills")) {
+    addError('Pi package.json files must include "skills", or the published package ships no skills.');
+  }
+
+  if (manifest.license !== "MIT") {
+    addError('Pi package.json "license" must be "MIT".');
+  }
+
+  requireVersionParity("Pi package.json", manifest.version, version);
+}
+
 async function validateMcpFiles() {
   const urls = new Map();
 
@@ -850,6 +881,7 @@ async function main() {
     await validateClaude(version);
     const codexCategory = await validateCodex(version);
     await validateCodexCatalog(codexCategory);
+    await validatePiPackage(version);
     await validateNoAntigravityNest();
     await validateSkillsAreSelfContained();
     await validateSkillLocalReferences();

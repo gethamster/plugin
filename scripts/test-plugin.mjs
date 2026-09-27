@@ -16,6 +16,7 @@ const readyScript = path.join(repoRoot, "skills", "setup", "scripts", "ensure-re
 
 const PACKAGE_ENTRIES = [
   "plugin.json",
+  "package.json",
   "LICENSE",
   "mcp.json",
   ".mcp.json",
@@ -282,6 +283,23 @@ test("a plugin description that drifts from its siblings fails validation", asyn
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Plugin descriptions have drifted across manifests/);
+});
+
+test("a Pi package version that drifts from the plugin fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-pi-version-");
+  await copyPackage(cwd);
+  const manifestPath = path.join(cwd, "package.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const rootVersion = JSON.parse(await readFile(path.join(cwd, "plugin.json"), "utf8")).version;
+  manifest.version = "0.0.1";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.ok(
+    result.stderr.includes(`Pi package.json version "0.0.1" does not match root "${rootVersion}".`),
+    result.stderr
+  );
 });
 
 test("an empty Codex logoDark fails validation", async () => {

@@ -1,0 +1,30 @@
+{
+  "name": "@tryhamster/pi",
+  "version": "3.4.3",
+  "description": "Hamster Studio skills for Pi: ask Hamster, install the CLI, and plan, ship, resume, review, QA, and retro Hamster briefs.",
+  "keywords": [
+    "pi-package",
+    "hamster",
+    "hamster-studio",
+    "brief-execution",
+    "skills"
+  ],
+  "homepage": "https://tryhamster.com/docs/hamster-studio/plugin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gethamster/plugin.git"
+  },
+  "license": "MIT",
+  "author": "Hamster <hello@tryhamster.com>",
+  "files": [
+    "skills"
+  ],
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
