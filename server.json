@@ -3,7 +3,7 @@
   "name": "io.github.gethamster/hamster",
   "title": "Hamster",
   "description": "Search and manage Hamster briefs, tasks, plans, and knowledge; trigger delivery from your agent.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://tryhamster.com/docs/hamster-studio/mcp",
   "repository": {
     "url": "https://github.com/gethamster/plugin",

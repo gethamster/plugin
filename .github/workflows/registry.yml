@@ -1,10 +1,15 @@
 name: MCP Registry
 
 # Separate from the plugin workflow because it publishes a different artifact
-# on a different version: server.json tracks the hosted server, not
+# on a different version: server.json follows the hosted server, not
 # plugin.json. Like the plugin tag, a version landing on main publishes it and
-# an already published version is a no-op. Registry versions are immutable, so
-# merge a bump only once the hosted server reports that version.
+# an already published, unchanged version is a no-op. Registry versions are
+# immutable, so merge a server bump only once the hosted server reports that
+# version. A fix to listing metadata alone takes the next patch version (a
+# prerelease suffix sorts before its release and would never become latest),
+# so the listing can run ahead of the server; the next server-driven bump must
+# then use a version above the listing's, even if the server reports exactly
+# the listing's version.
 on:
   push:
   pull_request:
@@ -39,6 +44,26 @@ jobs:
           plugin="$(jq -r '.mcpServers.hamster.url' mcp.json)"
           if [ "$listing" != "$plugin" ]; then
             echo "server.json remote $listing does not match mcp.json $plugin" >&2
+            exit 1
+          fi
+      # A published version can't be edited, so a server.json change that keeps
+      # its version publishes nothing and the publish job skips it as done. That
+      # is how 0.1.0 kept listing the old repository after the URL was fixed.
+      - name: Confirm an already published version is unchanged
+        run: |
+          set -euo pipefail
+          name="$(jq -r '.name' server.json)"
+          version="$(jq -r '.version' server.json)"
+          status="$(curl -sS -o versions.json -w '%{http_code}' "https://registry.modelcontextprotocol.io/v0.1/servers/${name//\//%2F}/versions")"
+          case "$status" in
+            200) ;;
+            404) exit 0 ;;
+            *) echo "registry versions lookup returned HTTP $status" >&2; exit 1 ;;
+          esac
+          published="$(jq -S --arg v "$version" '[.servers // [] | .[] | select(.server.version == $v) | .server][0] // empty' versions.json)"
+          if [ -n "$published" ] && [ "$published" != "$(jq -S . server.json)" ]; then
+            echo "server.json differs from the published $name $version, and registry versions are immutable. Bump \"version\" in server.json to republish." >&2
+            diff <(echo "$published") <(jq -S . server.json) >&2 || true
             exit 1
           fi
 
