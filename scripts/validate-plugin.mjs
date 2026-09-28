@@ -849,6 +849,53 @@ async function validateRootHasNoPlugin() {
       addError(`${entry} must not exist at the repository root; it belongs in ${PLUGIN_PATH}/.`);
     }
   }
+
+  // Beside the marketplace catalogs, .grok-plugin/plugin.json is the one plugin
+  // manifest the root may hold. Any other <client>-plugin/plugin.json there
+  // turns that client (or agy) back to a root install.
+  for (const entry of await fs.readdir(repoRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !/^\.[A-Za-z0-9_-]+-plugin$/.test(entry.name) || entry.name === ".grok-plugin") {
+      continue;
+    }
+    const manifest = path.join(entry.name, "plugin.json");
+    if (!ROOT_PLUGIN_ENTRIES.includes(manifest) && (await pathExists(path.join(repoRoot, manifest)))) {
+      addError(`${manifest} must not exist at the repository root; only .grok-plugin/plugin.json may.`);
+    }
+  }
+}
+
+// `grok plugin install gethamster/plugin` reads only a manifest at the source
+// root, so .grok-plugin/plugin.json points Grok into the plugin folder.
+// sync-adapters.mjs keeps its name, version, and description in step; this
+// checks that each component path resolves to the plugin's real files.
+async function validateGrokRootManifest() {
+  const manifest = await readJsonFile(path.join(repoRoot, ".grok-plugin", "plugin.json"), ".grok-plugin/plugin.json");
+  if (!manifest) {
+    return;
+  }
+  const expected = {
+    skills: { target: `./${PLUGIN_PATH}/skills`, kind: "directory" },
+    agents: { target: `./${PLUGIN_PATH}/agents`, kind: "directory" },
+    mcpServers: { target: `./${PLUGIN_PATH}/.mcp.json`, kind: "file" },
+  };
+  for (const [field, { target, kind }] of Object.entries(expected)) {
+    const value = manifest[field];
+    if (value !== target) {
+      addError(`.grok-plugin/plugin.json ${field} must be the ${kind} path "${target}", got ${JSON.stringify(value)}.`);
+      continue;
+    }
+    let info;
+    try {
+      info = await fs.stat(path.join(repoRoot, value));
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
+    }
+    if (!info || (kind === "directory" ? !info.isDirectory() : !info.isFile())) {
+      addError(`.grok-plugin/plugin.json ${field} points at ${value}, which is not a ${kind}.`);
+    }
+  }
 }
 
 // The Claude plugin directory refuses symbolic links in what a plugin loads and
@@ -968,6 +1015,7 @@ function summarizeAndExit() {
 async function main() {
   try {
     await validateRootHasNoPlugin();
+    await validateGrokRootManifest();
     await validatePluginFolderFiles();
     await validatePiPackage();
     const agentPluginsManifest = await validateAgentPluginsManifest();

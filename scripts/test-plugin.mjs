@@ -24,6 +24,7 @@ const PACKAGE_ENTRIES = [
   "LICENSE",
   ".cursor-plugin",
   ".claude-plugin",
+  ".grok-plugin",
   ".agents",
   "assets",
   "scripts",
@@ -304,6 +305,30 @@ test("a plugin manifest left at the repository root fails validation", async () 
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /plugin\.json must not exist at the repository root/);
   assert.match(result.stderr, /skills must not exist at the repository root/);
+});
+
+test("a Grok root manifest that drifts or stops pointing into plugins/hamster fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-grok-root-");
+  await copyPackage(cwd);
+  const manifestPath = path.join(cwd, ".grok-plugin", "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  // A release that bumps plugins/hamster but not this file, and an agents
+  // array, which Grok reads as zero agents.
+  manifest.version = "0.0.1";
+  manifest.agents = ["./plugins/hamster/agents/task-executor.md"];
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await mkdir(path.join(cwd, ".gemini-plugin"), { recursive: true });
+  await writeFile(path.join(cwd, ".gemini-plugin", "plugin.json"), "{}\n");
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /\.grok-plugin\/plugin\.json is out of sync with plugins\/hamster\/plugin\.json/);
+  assert.match(result.stderr, /\.grok-plugin\/plugin\.json agents must be the directory path "\.\/plugins\/hamster\/agents"/);
+  assert.match(result.stderr, /\.gemini-plugin\/plugin\.json must not exist at the repository root; only \.grok-plugin\/plugin\.json may/);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
 });
 
 test("a symlink or an image inside plugins/hamster fails validation", async () => {
