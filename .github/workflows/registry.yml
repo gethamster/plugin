@@ -36,9 +36,9 @@ jobs:
         run: |
           set -euo pipefail
           listing="$(jq -r '.remotes[0].url' server.json)"
-          plugin="$(jq -r '.mcpServers.hamster.url' mcp.json)"
+          plugin="$(jq -r '.mcpServers.hamster.url' plugins/hamster/mcp.json)"
           if [ "$listing" != "$plugin" ]; then
-            echo "server.json remote $listing does not match mcp.json $plugin" >&2
+            echo "server.json remote $listing does not match plugins/hamster/mcp.json $plugin" >&2
             exit 1
           fi
 

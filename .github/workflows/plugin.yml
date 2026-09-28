@@ -17,7 +17,7 @@ jobs:
           node-version: "20"
       - name: Run plugin package tests
         run: node --test scripts/test-plugin.mjs
-      - name: Check generated native agents and the claude/ package
+      - name: Check generated native agents
         run: node scripts/sync-adapters.mjs --check
       - name: Validate plugin package
         run: node scripts/validate-plugin.mjs
@@ -33,7 +33,7 @@ jobs:
           name: codex-skills-only-bundle-${{ github.event.pull_request.head.sha || github.sha }}
           path: dist/*.zip
 
-  # Bumping "version" in the root plugin.json on main publishes plugin-v<version>,
+  # Bumping "version" in plugins/hamster/plugin.json on main publishes plugin-v<version>,
   # so an install can pin an exact plugin version. Published tags are never
   # deleted or moved.
   #
@@ -52,11 +52,11 @@ jobs:
         id: plugin
         run: |
           SEMVER='^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$'
-          VERSION="$(node -p "require('./plugin.json').version ?? ''")"
+          VERSION="$(node -p "require('./plugins/hamster/plugin.json').version ?? ''")"
           # =~ anchors to the whole string; grep would anchor per line and let a
           # newline smuggle a second assignment into $GITHUB_OUTPUT.
           if [[ ! "$VERSION" =~ $SEMVER ]]; then
-            echo "Root plugin.json version \"${VERSION}\" is empty or not semver-ish." >&2
+            echo "plugins/hamster/plugin.json version \"${VERSION}\" is empty or not semver-ish." >&2
             exit 1
           fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"

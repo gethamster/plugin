@@ -81,7 +81,7 @@ To sign in to the hosted MCP server, run `/mcp auth hamster`.
 ### Grok Build
 
 ```text
-grok plugin install gethamster/plugin --trust
+grok plugin install gethamster/plugin#plugins/hamster --trust
 ```
 
 To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`.
@@ -213,22 +213,22 @@ Produces: metrics table, hourly distribution, session analysis, hotspots, PR siz
 | **task-executor** | Senior Engineer | Implements one parent task + subtasks; loads project skills, blueprints, and methods |
 | **wave-reviewer** | Staff Engineer | Reviews a whole wave's diff (per-parent verdicts + cross-parent integration checks), then simplifies |
 
-Canonical worker protocols live in `skills/ship/references/agents/`. Root `agents/task-executor.md` and `agents/wave-reviewer.md` are generated Claude Code native adapters (registration + model metadata) over those bodies — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. `com.github.copilot/agents` links to `agents/` so Copilot CLI registers them too; `.github/plugin/marketplace.json`, which Copilot reads before `.claude-plugin/marketplace.json`, keeps Copilot's install on the repository root where that link lives. Ship prefers the registered native agent when the client exposes it (Claude Code, Copilot CLI, and Grok Build do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
+Canonical worker protocols live in `plugins/hamster/skills/ship/references/agents/`. `plugins/hamster/agents/task-executor.md` and `agents/wave-reviewer.md` are generated native adapters (registration + model metadata) over those bodies, and `plugins/hamster/com.github.copilot/agents/` holds the same two files for Copilot CLI, which reads only that folder once `plugin.json` declares the Agent Plugins schema — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code, Copilot CLI, and Grok Build do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
 
-Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`); it is not part of the installed skill surface.
+Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`, `build-codex-skills-bundle.mjs`); it is not part of the installed plugin.
 
-`claude/` is the Claude Code package: regular-file copies of `.claude-plugin/plugin.json`, `.mcp.json`, `LICENSE`, `agents/`, and `skills/`, plus its own `README.md`. The Claude plugin directory scans only the plugin folder it is given, so `claude/` is that folder, and `.claude-plugin/marketplace.json` installs from it too, so a marketplace install and a directory install are the same package. Maintainer scripts, CI, listing images, and the other clients' manifests stay out of it. Edit the root files, never `claude/`: `node scripts/sync-adapters.mjs` rewrites the copies, and `--check`, which CI and `validate-plugin.mjs` run, fails when they drift. `claude/README.md` is written by hand, and it lists what the plugin runs, sends, and fetches, so update it when that changes.
+`plugins/hamster/` is the plugin: every client installs this one folder, and it is the folder submitted to the Claude plugin directory, which scans only the folder it is given. It holds each client's manifest (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, and the Agent Plugins `plugin.json`), the MCP dialect files, `skills/`, `agents/`, `com.github.copilot/agents/`, and its own `README.md`, which lists what the plugin runs, sends, and fetches, so update it when that changes. The repository root keeps only the marketplace catalogs that point at `./plugins/hamster` (`.claude-plugin/`, `.cursor-plugin/`, `.agents/plugins/`, `.github/plugin/`), the root `package.json` whose `pi.skills` points Pi at the same skills, and maintainer tooling, CI, and listing images. `validate-plugin.mjs` fails if a plugin manifest, `skills/`, or `agents/` reappears at the root, because Antigravity then installs the root and finds 0 skills, and it fails on any symbolic link or image inside `plugins/hamster/`. The Codex manifest there names no images; `build-codex-skills-bundle.mjs` adds the root `assets/` to the Codex Plugins Directory bundle.
 
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 
 | Source of truth | Copies |
 |---|---|
-| `skills/setup/scripts/ensure-ready.sh` | `ship`, `plan-hamster`, `resume-hamster` |
-| `skills/setup/scripts/ensure-ready.ps1` | `ship`, `plan-hamster`, `resume-hamster` |
-| `skills/ship/references/brief-selection.md` | `plan-hamster`, `resume-hamster` |
-| `skills/ship/references/execution-loop.md` | `resume-hamster` |
-| `skills/ship/references/agents/task-executor.md` | `resume-hamster` |
-| `skills/ship/references/agents/wave-reviewer.md` | `resume-hamster` |
+| `plugins/hamster/skills/setup/scripts/ensure-ready.sh` | `ship`, `plan-hamster`, `resume-hamster` |
+| `plugins/hamster/skills/setup/scripts/ensure-ready.ps1` | `ship`, `plan-hamster`, `resume-hamster` |
+| `plugins/hamster/skills/ship/references/brief-selection.md` | `plan-hamster`, `resume-hamster` |
+| `plugins/hamster/skills/ship/references/execution-loop.md` | `resume-hamster` |
+| `plugins/hamster/skills/ship/references/agents/task-executor.md` | `resume-hamster` |
+| `plugins/hamster/skills/ship/references/agents/wave-reviewer.md` | `resume-hamster` |
 
 ### Execution loop
 

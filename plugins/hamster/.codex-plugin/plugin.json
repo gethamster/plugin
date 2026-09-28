@@ -35,9 +35,6 @@
       "List actionable Briefs from the local projection and ship one"
     ],
     "brandColor": "#141414",
-    "brandColorDark": "#fafaf9",
-    "composerIcon": "./assets/icon.png",
-    "logo": "./assets/logo.png",
-    "logoDark": "./assets/logo-dark.png"
+    "brandColorDark": "#fafaf9"
   }
 }

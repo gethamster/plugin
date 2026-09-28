@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "hamster": {
-      "type": "http",
-      "url": "https://tryhamster.com/mcp"
-    }
-  }
-}

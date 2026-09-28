@@ -4,9 +4,11 @@
  * Stage and zip the skills-only package uploaded to Codex's Plugins Directory.
  *
  * A skills-only submission excludes MCP, app, and screenshot configuration, so
- * the bundle carries the Codex manifest stripped of those keys alongside the
- * skills tree, the listing assets, and the license. The repository itself keeps
- * its full CLI + MCP + skills shape for every GitHub and marketplace install.
+ * the bundle carries the Codex manifest from plugins/hamster stripped of those
+ * keys, with the listing images from the root assets/ added, alongside the
+ * skills tree and the license. plugins/hamster itself keeps its full CLI + MCP +
+ * skills shape for every GitHub and marketplace install, and no images, because
+ * the Claude plugin directory holds a plugin whose files refer to bundled images.
  *
  * Usage:
  *   node scripts/build-codex-skills-bundle.mjs                 # dist/
@@ -20,6 +22,14 @@ import path from "node:path";
 import process from "node:process";
 
 const repoRoot = process.cwd();
+const pluginDir = path.join(repoRoot, "plugins", "hamster");
+
+// The directory listing's images, added to the staged manifest only.
+const LISTING_IMAGES = {
+  composerIcon: "./assets/icon.png",
+  logo: "./assets/logo.png",
+  logoDark: "./assets/logo-dark.png",
+};
 
 // https://developers.openai.com/plugins/deploy/submission-errors names each
 // exclusion a skills-only upload is rejected for: mcp_configuration_excluded
@@ -117,7 +127,7 @@ function requireCleanCheckout(outDir) {
 }
 
 async function listSkillNames() {
-  const skillsDir = path.join(repoRoot, "skills");
+  const skillsDir = path.join(pluginDir, "skills");
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
   const names = entries
     .filter((entry) => entry.isDirectory())
@@ -125,7 +135,7 @@ async function listSkillNames() {
     .sort();
 
   if (names.length === 0) {
-    throw new Error("skills/ has no skill directories; the directory rejects a bundle with no skill.");
+    throw new Error("plugins/hamster/skills/ has no skill directories; the directory rejects a bundle with no skill.");
   }
 
   return names;
@@ -135,20 +145,21 @@ async function stageBundle(stagingDir, skillNames) {
   await fs.rm(stagingDir, { recursive: true, force: true });
   await fs.mkdir(path.join(stagingDir, ".codex-plugin"), { recursive: true });
 
-  const manifest = await readJsonFile(path.join(repoRoot, ".codex-plugin", "plugin.json"));
+  const manifest = await readJsonFile(path.join(pluginDir, ".codex-plugin", "plugin.json"));
   for (const key of EXCLUDED_MANIFEST_KEYS) {
     delete manifest[key];
   }
   for (const key of EXCLUDED_INTERFACE_KEYS) {
     delete manifest.interface?.[key];
   }
+  Object.assign(manifest.interface, LISTING_IMAGES);
   await fs.writeFile(
     path.join(stagingDir, ".codex-plugin", "plugin.json"),
     `${JSON.stringify(manifest, null, 2)}\n`
   );
 
   for (const name of skillNames) {
-    await fs.cp(path.join(repoRoot, "skills", name), path.join(stagingDir, "skills", name), {
+    await fs.cp(path.join(pluginDir, "skills", name), path.join(stagingDir, "skills", name), {
       recursive: true,
       dereference: true,
     });
@@ -198,10 +209,10 @@ async function verifyStaging(stagingDir, skillNames) {
     }
   }
 
-  for (const field of ["logo", "logoDark", "composerIcon"]) {
+  for (const field of Object.keys(LISTING_IMAGES)) {
     const value = manifest.interface?.[field];
     if (value === undefined) {
-      continue;
+      throw new Error(`The bundle manifest has no interface.${field}.`);
     }
     const resolved = path.resolve(stagingDir, value);
     const relative = path.relative(stagingDir, resolved);
@@ -289,9 +300,9 @@ async function main() {
   const outDir = path.resolve(repoRoot, options.out);
   requireCleanCheckout(outDir);
 
-  const { version } = await readJsonFile(path.join(repoRoot, "plugin.json"));
+  const { version } = await readJsonFile(path.join(pluginDir, "plugin.json"));
   if (!version) {
-    throw new Error("Root plugin.json has no version.");
+    throw new Error("plugins/hamster/plugin.json has no version.");
   }
 
   const stagingDir = path.join(outDir, "codex-skills-only");

@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "hamster",
-      "source": "./",
+      "source": "./plugins/hamster",
       "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes"
     }
   ]
