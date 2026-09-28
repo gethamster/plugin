@@ -1,14 +1,11 @@
 #!/usr/bin/env bash
 # Install the Hamster CLI. No sudo.
 #
-# This is the Hamster CLI installer. https://tryhamster.com/cli/install
-# redirects to this file on the main branch, and the plugin's setup skill runs
-# it directly, so the tryhamster.com/cli/install one-liner and the setup skill
-# both run the same script.
-#
-# That redirect names this exact path,
-# plugins/hamster/skills/setup/scripts/install-hamster-cli.sh, so moving or
-# renaming the file breaks the install URL.
+# This is the Hamster CLI installer. The plugin's setup skill runs it directly
+# from its own scripts/ folder, so what installs the CLI is part of the plugin.
+# It is written to be served as https://tryhamster.com/cli/install too; keep
+# its path, plugins/hamster/skills/setup/scripts/install-hamster-cli.sh,
+# stable so that URL can point at it.
 #
 # It downloads a release archive from github.com/gethamster/plugin, refuses to
 # install unless the archive matches the SHA-256 published next to it, installs

@@ -881,22 +881,35 @@ async function validatePluginIcon(iconPath) {
 // plugin ships, skill and README text included, because what runs then isn't
 // part of the reviewed plugin. setup runs its bundled installer instead, and
 // these catch the shapes that hand a download straight to an interpreter:
-// `curl … | bash`, `bash <(curl …)`, `iwr … | iex`, and `iex (iwr …)`.
+// `curl … | bash` (also through sudo, env, VAR=value, or a /path/to/bash),
+// `bash <(curl …)`, `bash -c "$(curl …)"`, `eval "$(curl …)"`, `iwr … | iex`,
+// `iex (iwr …)`, and `iex ((New-Object Net.WebClient).DownloadString(…))`.
 const DOWNLOAD_AND_RUN_PATTERNS = [
-  /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]*\|\s*(?:(?:sudo|doas)\s+)?(?:(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|pwsh|powershell)(?:\s+-\S*)*\s*(?:$|[;&|)`'"])|iex\b|invoke-expression\b)/i,
-  /\b(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*)\s+<\(\s*(?:curl|wget)\b/i,
+  /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]*\|\s*(?:(?:sudo|doas)(?:\s+-\S+)*\s+)?(?:(?:\S*\/)?env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:\S*\/)?(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|pwsh|powershell|iex|invoke-expression)(?![\w-])/i,
+  /\b(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|source|\.)\s+<\(\s*(?:curl|wget)\b/i,
+  /(?:\s-c|\beval)\s+["']?\$\(\s*(?:curl|wget)\b/i,
   /\b(?:iex|invoke-expression)\s*\(\s*(?:iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget)\b/i,
+  /\b(?:iex|invoke-expression)\b[^\n]*\.Download(?:String|File)\s*\(/i,
 ];
 
 async function validateNoDownloadAndRun(filePath) {
   const lines = (await fs.readFile(filePath, "utf8")).split("\n");
-  lines.forEach((line, index) => {
-    if (DOWNLOAD_AND_RUN_PATTERNS.some((pattern) => pattern.test(line))) {
+  // A command continued with a trailing backslash is checked as one line and
+  // reported at the line it starts on.
+  for (let start = 0; start < lines.length; start += 1) {
+    let command = lines[start].replace(/\r$/, "");
+    let end = start;
+    while (command.endsWith("\\") && end + 1 < lines.length) {
+      end += 1;
+      command = `${command.slice(0, -1)} ${lines[end].replace(/\r$/, "")}`;
+    }
+    if (DOWNLOAD_AND_RUN_PATTERNS.some((pattern) => pattern.test(command))) {
       addError(
-        `${path.relative(repoRoot, filePath)}:${index + 1} pipes a download into a shell, which the Claude plugin directory flags as a download-and-run command. Ship the script in ${PLUGIN_PATH}/ and run that file instead.`
+        `${path.relative(repoRoot, filePath)}:${start + 1} pipes a download into a shell, which the Claude plugin directory flags as a download-and-run command. Ship the script in ${PLUGIN_PATH}/ and run that file instead.`
       );
     }
-  });
+    start = end;
+  }
 }
 
 async function validatePluginFolderFiles(dir = pluginDir) {
