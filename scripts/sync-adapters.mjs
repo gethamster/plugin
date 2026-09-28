@@ -3,8 +3,7 @@
 /**
  * Generate plugins/hamster/agents/*.md as native-agent projections over the
  * canonical skill-local prompt bodies under
- * plugins/hamster/skills/ship/references/agents/, and the same files under
- * plugins/hamster/com.github.copilot/agents/ for Copilot CLI.
+ * plugins/hamster/skills/ship/references/agents/.
  *
  * Usage:
  *   node scripts/sync-adapters.mjs          # write generated files
@@ -19,11 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = process.cwd();
 const pluginDir = path.join("plugins", "hamster");
-// Claude Code, Grok Build, and Antigravity read agents/. Copilot CLI reads only
-// com.github.copilot/agents/ once plugin.json declares the Agent Plugins schema,
-// and the Claude plugin directory refuses symbolic links, so both are regular
-// files rendered from the same body.
-const AGENT_DIRS = [path.join(pluginDir, "agents"), path.join(pluginDir, "com.github.copilot", "agents")];
+const agentsDir = path.join(pluginDir, "agents");
 
 // Descriptions stay single-line: cursor.directory and validate-plugin.mjs read
 // frontmatter line by line, so a `|` block scalar is listed as a literal pipe.
@@ -92,35 +87,33 @@ export async function syncAdapters({ check = false } = {}) {
 
     const rendered = renderAgent(agent, body);
 
-    for (const agentDir of AGENT_DIRS) {
-      const targetPath = path.join(repoRoot, agentDir, `${agent.id}.md`);
-      if (check) {
-        let existing;
-        try {
-          existing = await fs.readFile(targetPath, "utf8");
-        } catch (error) {
-          if (error.code === "ENOENT") {
-            errors.push(
-              `Generated agent missing: ${path.relative(repoRoot, targetPath)}. Run \`node scripts/sync-adapters.mjs\`.`
-            );
-          } else {
-            errors.push(`Could not read generated agent ${path.relative(repoRoot, targetPath)}: ${error.message}`);
-          }
-          continue;
-        }
-
-        if (digest(existing.replace(/\r\n/g, "\n")) !== digest(rendered)) {
+    const targetPath = path.join(repoRoot, agentsDir, `${agent.id}.md`);
+    if (check) {
+      let existing;
+      try {
+        existing = await fs.readFile(targetPath, "utf8");
+      } catch (error) {
+        if (error.code === "ENOENT") {
           errors.push(
-            `${path.relative(repoRoot, targetPath)} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
+            `Generated agent missing: ${path.relative(repoRoot, targetPath)}. Run \`node scripts/sync-adapters.mjs\`.`
           );
+        } else {
+          errors.push(`Could not read generated agent ${path.relative(repoRoot, targetPath)}: ${error.message}`);
         }
         continue;
       }
 
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      await fs.writeFile(targetPath, rendered, "utf8");
-      written.push(path.relative(repoRoot, targetPath));
+      if (digest(existing.replace(/\r\n/g, "\n")) !== digest(rendered)) {
+        errors.push(
+          `${path.relative(repoRoot, targetPath)} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
+        );
+      }
+      continue;
     }
+
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, rendered, "utf8");
+    written.push(path.relative(repoRoot, targetPath));
   }
 
   return { errors, written };

@@ -26,8 +26,12 @@ const pluginNamePattern = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
 // plugin.yml derives the public plugin-v<version> git tag from this value, so a
 // malformed version must fail on the PR rather than when the tag job runs on main.
 const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
-const rootPluginFields = new Set([
-  "$schema",
+// Without plugins/hamster/plugin.json, Antigravity stages the MCP server with an
+// empty command instead of the mcp_config.json URL. It keeps the Agent Plugins
+// field set. It must not declare
+// the Agent Plugins "$schema": once it does, Copilot CLI reads agents only from
+// com.github.copilot/agents/ and registers neither worker from agents/.
+const pluginManifestFields = new Set([
   "name",
   "version",
   "description",
@@ -258,7 +262,9 @@ async function validateAgentPluginsManifest() {
   }
 
   for (const key of Object.keys(manifest)) {
-    if (!rootPluginFields.has(key)) {
+    if (key === "$schema") {
+      addError(`${PLUGIN_PATH}/plugin.json must not declare "$schema"; with it, Copilot CLI stops registering agents/.`);
+    } else if (!pluginManifestFields.has(key)) {
       addError(`${PLUGIN_PATH}/plugin.json has non-Agent-Plugins field "${key}".`);
     }
   }
@@ -300,32 +306,11 @@ function validateMarketplaceEntry(context, entry, version) {
   requireVersionParity(`${context} plugins[0]`, entry.version, version);
 }
 
-// Copilot CLI reads .github/plugin/marketplace.json before
-// .claude-plugin/marketplace.json, so both must name the same folder.
-async function validateCopilot(version) {
-  const marketplacePath = path.join(repoRoot, ".github", "plugin", "marketplace.json");
-  const marketplace = await readJsonFile(marketplacePath, "Copilot marketplace manifest");
-  if (!marketplace) {
-    return;
-  }
-  if (marketplace.name !== "hamster-plugins") {
-    addError('Copilot marketplace.json name must be "hamster-plugins".');
-  }
-  const entry = Array.isArray(marketplace.plugins) ? marketplace.plugins[0] : null;
-  if (!entry || entry.name !== "hamster") {
-    addError('Copilot marketplace.json plugins[0].name must be "hamster".');
-    return;
-  }
-  if (!isPluginSource(entry.source)) {
-    addError(`Copilot marketplace.json plugins[0].source must be "${PLUGIN_SOURCE}", got ${JSON.stringify(entry.source)}.`);
-  }
-  requireVersionParity("Copilot marketplace.json plugins[0]", entry.version, version);
-}
-
 // cursor/plugins/schemas/marketplace.schema.json is closed at the root (name,
 // owner, metadata, plugins) and per plugin entry (name, source, description,
 // minClientVersions); only metadata is open. Everything else lives in
 // .cursor-plugin/plugin.json, which Cursor merges over the entry.
+const REPO_ASSET_URL = "https://raw.githubusercontent.com/gethamster/plugin/main/";
 const cursorMarketplaceFields = new Set(["name", "owner", "metadata", "plugins"]);
 const cursorMarketplaceEntryFields = new Set(["name", "source", "description", "minClientVersions"]);
 
@@ -369,10 +354,11 @@ async function validateCursor(version) {
     addError('Cursor plugin.json must include a non-empty "displayName".');
   }
 
-  if (typeof manifest.logo !== "string" || manifest.logo.length === 0) {
-    addError('Cursor plugin.json must include "logo".');
+  // The logo stays out of plugins/hamster, so it is a URL to the root assets/.
+  if (typeof manifest.logo !== "string" || !manifest.logo.startsWith(REPO_ASSET_URL)) {
+    addError(`Cursor plugin.json "logo" must be a URL under ${REPO_ASSET_URL}.`);
   } else {
-    await validateReferencedPath(pluginDir, "logo", manifest.logo, "cursor");
+    await validateReferencedPath(repoRoot, "logo", manifest.logo.slice(REPO_ASSET_URL.length), "cursor");
   }
 
   if (manifest.license !== "MIT") {
@@ -625,6 +611,8 @@ async function validateCodex(version) {
 async function validateMcpFiles() {
   const urls = new Map();
 
+  // Antigravity reads mcp_config.json; Claude Code, Codex, Copilot CLI, Cursor,
+  // and Grok Build read .mcp.json.
   const config = await readJsonFile(path.join(pluginDir, "mcp_config.json"), `${PLUGIN_PATH}/mcp_config.json`);
   if (config) {
     const serverUrl = config.mcpServers?.hamster?.serverUrl;
@@ -632,16 +620,6 @@ async function validateMcpFiles() {
       addError("mcp_config.json must set mcpServers.hamster.serverUrl.");
     } else {
       urls.set("mcp_config.json", serverUrl);
-    }
-  }
-
-  const agentPlugins = await readJsonFile(path.join(pluginDir, "mcp.json"), `${PLUGIN_PATH}/mcp.json`);
-  if (agentPlugins) {
-    const server = agentPlugins.mcpServers?.hamster;
-    if (server?.type !== "streamable-http" || typeof server?.url !== "string" || server.url.length === 0) {
-      addError('mcp.json must set mcpServers.hamster to { type: "streamable-http", url }.');
-    } else {
-      urls.set("mcp.json", server.url);
     }
   }
 
@@ -933,7 +911,6 @@ async function main() {
     const version = agentPluginsManifest?.version ?? null;
     await validateCursor(version);
     await validateClaude(version);
-    await validateCopilot(version);
     const codexCategory = await validateCodex(version);
     await validateCodexCatalog(codexCategory);
     await validateNoAntigravityNest();

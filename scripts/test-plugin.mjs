@@ -15,7 +15,6 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 // path built from where the checkout happens to live.
 const VALIDATOR = "scripts/validate-plugin.mjs";
 const BUNDLE_BUILDER = "scripts/build-codex-skills-bundle.mjs";
-const SYNC_ADAPTERS = "scripts/sync-adapters.mjs";
 const READY_SCRIPT = "plugins/hamster/skills/setup/scripts/ensure-ready.sh";
 
 const PACKAGE_ENTRIES = [
@@ -27,7 +26,6 @@ const PACKAGE_ENTRIES = [
   ".agents",
   "assets",
   "scripts",
-  ".github/plugin",
 ];
 
 // The folder every client installs, inside a fixture copy.
@@ -184,25 +182,12 @@ test("a Claude marketplace that installs from the repository root fails validati
   assert.match(result.stderr, /Claude marketplace\.json plugins\[0\]\.source must be "\.\/plugins\/hamster"/);
 });
 
-test("a Copilot marketplace version that drifts fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-copilot-version-");
-  await copyPackage(cwd);
-  const marketplacePath = path.join(cwd, ".github", "plugin", "marketplace.json");
-  const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
-  marketplace.plugins[0].version = "0.0.1";
-  await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Copilot marketplace\.json plugins\[0\] version "0\.0\.1" does not match plugins\/hamster\/plugin\.json/);
-});
-
 test("a missing referenced path fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-ref-");
   await copyPackage(cwd);
   const manifestPath = plugin(cwd, ".cursor-plugin", "plugin.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  manifest.logo = "assets/does-not-exist.svg";
+  manifest.logo = "https://raw.githubusercontent.com/gethamster/plugin/main/assets/does-not-exist.svg";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const result = await runValidator(cwd);
@@ -311,13 +296,29 @@ test("a plugin manifest left at the repository root fails validation", async () 
 test("a symlink or an image inside plugins/hamster fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-folder-files-");
   await copyPackage(cwd);
-  await symlink("../agents", plugin(cwd, "com.github.copilot", "linked-agents"));
+  await symlink("agents", plugin(cwd, "linked-agents"));
   await cp(path.join(cwd, "assets", "logo.png"), plugin(cwd, "skills", "setup", "logo.png"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/com\.github\.copilot\/linked-agents is a symbolic link/);
+  assert.match(result.stderr, /plugins\/hamster\/linked-agents is a symbolic link/);
   assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/logo\.png is an image/);
+});
+
+test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-schema-");
+  await copyPackage(cwd);
+  // Copilot CLI then reads agents only from com.github.copilot/agents/.
+  const manifestPath = plugin(cwd, "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  await writeFile(
+    manifestPath,
+    `${JSON.stringify({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", ...manifest }, null, 2)}\n`
+  );
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /plugins\/hamster\/plugin\.json must not declare "\$schema"/);
 });
 
 test("a Codex manifest that points at a bundled image fails validation", async () => {
@@ -330,17 +331,6 @@ test("a Codex manifest that points at a bundled image fails validation", async (
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /interface\.logo must not be set/);
-});
-
-test("a Copilot agent that drifts from the generated agent fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-copilot-agent-");
-  await copyPackage(cwd);
-  const agentPath = plugin(cwd, "com.github.copilot", "agents", "task-executor.md");
-  await writeFile(agentPath, `${await readFile(agentPath, "utf8")}\nEdited for Copilot only.\n`);
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/com\.github\.copilot\/agents\/task-executor\.md is out of sync/);
 });
 
 test("a Pi manifest that stops pointing at plugins/hamster fails validation", async () => {
