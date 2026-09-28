@@ -100,7 +100,7 @@ Read [execution-loop](references/execution-loop.md) and follow it for every wave
 | Prereq failure | Stop with instructions (uncommitted changes: ask stash/proceed) |
 | Account unresolved | Stop; follow Account Resolution's team-selection/re-sync guidance |
 | Brief not found | Show partial matches, ask user |
-| Auth expired | `hamster auth login`; continue without status updates if it fails |
+| Auth expired | If `hamster --no-tui status` lacks `Logged in`, ask before `hamster auth login` (opens a browser); if declined or it fails, continue without status updates |
 | Merge conflict (base or between executors) | Stop, report, never auto-resolve |
 | Test gate fails | Stop, report, ask fix or skip |
 | NEEDS_FIXES after 2 rounds | Report to user, ask skip or manual fix |

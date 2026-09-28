@@ -42,11 +42,21 @@ Then put `~/.hamster/bin` on PATH for this session.
 
 ## Sign in
 
+Check for an existing sign-in first:
+
+```bash
+hamster --no-tui status
+```
+
+If it says `Logged in`, don't sign in again: tell the user which account it names and go on to Init and sync. Signing in again replaces that session.
+
+Otherwise, tell the user a browser window is about to open for Hamster sign-in and ask before continuing. Only after they agree, run:
+
 ```bash
 hamster auth login
 ```
 
-This opens a browser. Wait until it finishes. Do not paste tokens into chat.
+Wait until it finishes. Do not paste tokens into chat. If they decline, stop and report that setup needs sign-in.
 
 ## Init and sync
 
