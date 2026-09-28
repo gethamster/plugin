@@ -30,7 +30,7 @@
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
     "defaultPrompt": [
-      "Install Hamster in this repository. Fetch and follow https://tryhamster.com/plugin/install",
+      "Set up Hamster in this repository with $hamster:setup",
       "I'm changing auth middleware on this branch. Which workspace decisions apply?",
       "List actionable Briefs from the local projection and ship one"
     ],

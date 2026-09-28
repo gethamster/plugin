@@ -544,6 +544,9 @@ async function validateCodexInterface(iface) {
     if (prompt.includes("@")) {
       codexError(`defaultPrompt[${index}]`, 'must not mention another plugin with "@".');
     }
+    if (/https?:\/\//i.test(prompt)) {
+      codexError(`defaultPrompt[${index}]`, "must not send the agent to a URL; name a bundled skill such as $hamster:setup instead.");
+    }
     const normalized = prompt.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
     if (seenPrompts.has(normalized)) {
       codexError(`defaultPrompt[${index}]`, "duplicates an earlier prompt.");

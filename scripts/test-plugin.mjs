@@ -231,6 +231,18 @@ test("a fourth Codex starter prompt fails validation", async () => {
   assert.match(result.stderr, /interface\.defaultPrompt has 4 entries; the directory allows at most 3/);
 });
 
+test("a Codex starter prompt that sends the agent to a URL fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-prompt-url-");
+  await copyPackage(cwd);
+  await patchCodexInterface(cwd, (iface) => {
+    iface.defaultPrompt[0] = "Install Hamster. Fetch and follow https://tryhamster.com/plugin/install";
+  });
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /interface\.defaultPrompt\[0\] must not send the agent to a URL/);
+});
+
 test("a non-https Codex privacyPolicyURL fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-privacy-");
   await copyPackage(cwd);
