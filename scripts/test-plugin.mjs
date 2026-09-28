@@ -692,6 +692,27 @@ test("the CLI installer verifies, installs, and edits shell and CLI config once"
   assert.equal(bashrc.match(/^alias ham='hamster'$/gm)?.length, 1);
 });
 
+test("the CLI installer names every supported client's install command", async () => {
+  const { invoke } = await runInstaller();
+  const result = await invoke();
+  assert.equal(result.code, 0, result.stderr);
+  const start = result.stdout.indexOf("Next: add the Hamster plugin in your editor.");
+  const end = result.stdout.indexOf("To keep the plan on disk in a git repo:");
+  assert.ok(start !== -1 && end > start);
+  const next = result.stdout.slice(start, end);
+  for (const block of [
+    "Claude Code         /plugin marketplace add gethamster/plugin\n                      /plugin install hamster@hamster-plugins",
+    "Codex               codex plugin marketplace add gethamster/plugin\n                      codex plugin add hamster@hamster-plugins",
+    "Cursor              Customize > Add Marketplace > Import from GitHub > https://github.com/gethamster/plugin",
+    "Antigravity         agy plugin install https://github.com/gethamster/plugin",
+    "GitHub Copilot CLI  copilot plugin marketplace add gethamster/plugin\n                      copilot plugin install hamster@hamster-plugins",
+    "Grok Build          grok plugin install gethamster/plugin --trust",
+    "Pi                  pi install git:github.com/gethamster/plugin",
+  ]) {
+    assert.ok(next.includes(block), block);
+  }
+});
+
 test("the CLI installer says so when it cannot write config.yaml", async (t) => {
   if (process.getuid?.() === 0) {
     t.skip("root can write a read-only directory");

@@ -232,12 +232,16 @@ fi
 cat <<'EOF'
 
 Next: add the Hamster plugin in your editor.
-  Claude Code  /plugin marketplace add gethamster/plugin
-               /plugin install hamster@hamster-plugins
-  Codex        codex plugin marketplace add gethamster/plugin
-               codex plugin add hamster@hamster-plugins
-  Cursor       Customize > Add Marketplace > Import from GitHub > https://github.com/gethamster/plugin
-  Antigravity  agy plugin install https://github.com/gethamster/plugin
+  Claude Code         /plugin marketplace add gethamster/plugin
+                      /plugin install hamster@hamster-plugins
+  Codex               codex plugin marketplace add gethamster/plugin
+                      codex plugin add hamster@hamster-plugins
+  Cursor              Customize > Add Marketplace > Import from GitHub > https://github.com/gethamster/plugin
+  Antigravity         agy plugin install https://github.com/gethamster/plugin
+  GitHub Copilot CLI  copilot plugin marketplace add gethamster/plugin
+                      copilot plugin install hamster@hamster-plugins
+  Grok Build          grok plugin install gethamster/plugin --trust
+  Pi                  pi install git:github.com/gethamster/plugin
 
 To keep the plan on disk in a git repo:
   hamster auth login    # sign in to Hamster
