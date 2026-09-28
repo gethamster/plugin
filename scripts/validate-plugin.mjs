@@ -877,6 +877,28 @@ async function validatePluginIcon(iconPath) {
   }
 }
 
+// The Claude plugin directory flags a download-and-run command in any file the
+// plugin ships, skill and README text included, because what runs then isn't
+// part of the reviewed plugin. setup runs its bundled installer instead, and
+// these catch the shapes that hand a download straight to an interpreter:
+// `curl … | bash`, `bash <(curl …)`, `iwr … | iex`, and `iex (iwr …)`.
+const DOWNLOAD_AND_RUN_PATTERNS = [
+  /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]*\|\s*(?:(?:sudo|doas)\s+)?(?:(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|pwsh|powershell)(?:\s+-\S*)*\s*(?:$|[;&|)`'"])|iex\b|invoke-expression\b)/i,
+  /\b(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*)\s+<\(\s*(?:curl|wget)\b/i,
+  /\b(?:iex|invoke-expression)\s*\(\s*(?:iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget)\b/i,
+];
+
+async function validateNoDownloadAndRun(filePath) {
+  const lines = (await fs.readFile(filePath, "utf8")).split("\n");
+  lines.forEach((line, index) => {
+    if (DOWNLOAD_AND_RUN_PATTERNS.some((pattern) => pattern.test(line))) {
+      addError(
+        `${path.relative(repoRoot, filePath)}:${index + 1} pipes a download into a shell, which the Claude plugin directory flags as a download-and-run command. Ship the script in ${PLUGIN_PATH}/ and run that file instead.`
+      );
+    }
+  });
+}
+
 async function validatePluginFolderFiles(dir = pluginDir) {
   let entries;
   try {
@@ -899,6 +921,8 @@ async function validatePluginFolderFiles(dir = pluginDir) {
       await validatePluginIcon(entryPath);
     } else if (IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
       addError(`${relative} is an image; keep listing images in the root assets/.`);
+    } else {
+      await validateNoDownloadAndRun(entryPath);
     }
   }
 }
