@@ -305,6 +305,25 @@ test("a symlink or an image inside plugins/hamster fails validation", async () =
   assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/logo\.png is an image/);
 });
 
+test("only a self-contained .claude-plugin/icon.svg may be an image inside plugins/hamster", async () => {
+  const cwd = await makeTemp("hamster-plugin-icon-");
+  await copyPackage(cwd);
+  const iconPath = plugin(cwd, ".claude-plugin", "icon.svg");
+  // The same SVG anywhere else in the plugin is still a bundled image.
+  await cp(iconPath, plugin(cwd, "icon.svg"));
+  await cp(iconPath, plugin(cwd, "skills", "setup", "icon.svg"));
+  const icon = await readFile(iconPath, "utf8");
+  await writeFile(iconPath, icon.replace("</svg>", '<image href="https://example.com/logo.png"/></svg>'));
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /plugins\/hamster\/icon\.svg is an image/);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/icon\.svg is an image/);
+  assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not contain <image>/);
+  assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not reference external resources/);
+  assert.doesNotMatch(result.stderr, /\.claude-plugin\/icon\.svg is an image/);
+});
+
 test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-schema-");
   await copyPackage(cwd);
@@ -389,7 +408,7 @@ test("the Codex bundle carries only skills, assets, and a stripped manifest", as
   assert.equal(Object.hasOwn(manifest, "apps"), false);
   assert.equal(Object.hasOwn(manifest.interface, "screenshots"), false);
   assert.equal(manifest.interface.displayName, "Hamster");
-  // plugins/hamster carries no images, so the listing images come from the root assets/.
+  // plugins/hamster carries no Codex listing images, so they come from the root assets/.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
   assert.equal(manifest.interface.logo, "./assets/logo.png");
   assert.equal(manifest.interface.logoDark, "./assets/logo-dark.png");

@@ -850,8 +850,29 @@ async function validateRootHasNoPlugin() {
 
 // The Claude plugin directory refuses symbolic links in what a plugin loads and
 // holds a plugin whose files refer to bundled images. Listing images stay in the
-// root assets/.
+// root assets/. The one exception is .claude-plugin/icon.svg, which the
+// directory reads for its listing icon: SVG is text the scan can read, so it is
+// allowed as long as it pulls in no raster, script, or external resource.
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"]);
+const PLUGIN_ICON = path.join(pluginDir, ".claude-plugin", "icon.svg");
+
+async function validatePluginIcon(iconPath) {
+  const relative = path.relative(repoRoot, iconPath);
+  const svg = await fs.readFile(iconPath, "utf8");
+  if (svg.includes("\u0000") || svg.includes("\uFFFD")) {
+    addError(`${relative} must be UTF-8 text.`);
+    return;
+  }
+  if (!/^\s*(?:<\?xml[^>]*\?>\s*)?<svg[\s>]/.test(svg)) {
+    addError(`${relative} must be an SVG document starting with <svg>.`);
+  }
+  if (/<(?:image|script|foreignObject)\b/i.test(svg)) {
+    addError(`${relative} must not contain <image>, <script>, or <foreignObject>.`);
+  }
+  if (/\bhref\s*=\s*["']\s*(?!#)/i.test(svg)) {
+    addError(`${relative} must not reference external resources; only #fragment hrefs are allowed.`);
+  }
+}
 
 async function validatePluginFolderFiles(dir = pluginDir) {
   let entries;
@@ -871,6 +892,8 @@ async function validatePluginFolderFiles(dir = pluginDir) {
       addError(`${relative} is a symbolic link; ${PLUGIN_PATH}/ must hold regular files.`);
     } else if (entry.isDirectory()) {
       await validatePluginFolderFiles(entryPath);
+    } else if (entryPath === PLUGIN_ICON) {
+      await validatePluginIcon(entryPath);
     } else if (IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
       addError(`${relative} is an image; keep listing images in the root assets/.`);
     }

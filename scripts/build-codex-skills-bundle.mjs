@@ -7,8 +7,9 @@
  * the bundle carries the Codex manifest from plugins/hamster stripped of those
  * keys, with the listing images from the root assets/ added, alongside the
  * skills tree and the license. plugins/hamster itself keeps its full CLI + MCP +
- * skills shape for every GitHub and marketplace install, and no images, because
- * the Claude plugin directory holds a plugin whose files refer to bundled images.
+ * skills shape for every GitHub and marketplace install, and no images beyond
+ * the Claude directory's text-only .claude-plugin/icon.svg, because the Claude
+ * plugin directory holds a plugin whose files refer to bundled images.
  *
  * Usage:
  *   node scripts/build-codex-skills-bundle.mjs                 # dist/
