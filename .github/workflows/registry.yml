@@ -29,7 +29,7 @@ jobs:
           curl -fL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
       - name: Validate against the registry schema
         run: ./mcp-publisher validate
-      # validate-plugin.mjs keeps the three plugin manifests on one endpoint;
+      # validate-plugin.mjs keeps .mcp.json and mcp_config.json on one endpoint;
       # this keeps the registry listing on the same one, so a moved endpoint
       # cannot be published while the installed plugin still points elsewhere.
       - name: Confirm the remote matches the plugin endpoint
