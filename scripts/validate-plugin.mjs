@@ -944,12 +944,14 @@ async function validatePluginIcon(iconPath) {
 }
 
 // The Claude plugin directory flags a download-and-run command in any file the
-// plugin ships, skill and README text included, because what runs then isn't
-// part of the reviewed plugin. setup runs its bundled installer instead, and
-// these catch the shapes that hand a download straight to an interpreter:
-// `curl … | bash` (also through sudo, env, VAR=value, or a /path/to/bash),
-// `bash <(curl …)`, `bash -c "$(curl …)"`, `eval "$(curl …)"`, `iwr … | iex`,
-// `iex (iwr …)`, and `iex ((New-Object Net.WebClient).DownloadString(…))`.
+// plugin ships, skill and README text included. This plugin does not install
+// the CLI. These catch a fetch command and the shapes that hand a download
+// straight to an interpreter: `curl … | bash` (also through sudo, env,
+// VAR=value, or a /path/to/bash), `bash <(curl …)`, `bash -c "$(curl …)"`,
+// `eval "$(curl …)"`, `iwr … | iex`, `iex (iwr …)`, and
+// `iex ((New-Object Net.WebClient).DownloadString(…))`.
+const DOWNLOAD_COMMAND = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b/i;
+const INSTALL_SCRIPT = /(?:^|\/)install[^/]*\.(?:sh|bash|zsh|ps1)$/i;
 const DOWNLOAD_AND_RUN_PATTERNS = [
   /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod)\b[^|\n]*\|\s*(?:(?:sudo|doas)(?:\s+-\S+)*\s+)?(?:(?:\S*\/)?env\s+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*(?:\S*\/)?(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|pwsh|powershell|iex|invoke-expression)(?![\w-])/i,
   /\b(?:bash|sh|zsh|dash|ksh|fish|node|perl|ruby|python[0-9.]*|source|\.)\s+<\(\s*(?:curl|wget)\b/i,
@@ -969,9 +971,14 @@ async function validateNoDownloadAndRun(filePath) {
       end += 1;
       command = `${command.slice(0, -1)} ${lines[end].replace(/\r$/, "")}`;
     }
+    const relative = `${path.relative(repoRoot, filePath)}:${start + 1}`;
     if (DOWNLOAD_AND_RUN_PATTERNS.some((pattern) => pattern.test(command))) {
       addError(
-        `${path.relative(repoRoot, filePath)}:${start + 1} pipes a download into a shell, which the Claude plugin directory flags as a download-and-run command. Ship the script in ${PLUGIN_PATH}/ and run that file instead.`
+        `${relative} pipes a download into a shell. The plugin must not download or run a fetched file. Point at the install docs instead.`
+      );
+    } else if (DOWNLOAD_COMMAND.test(command)) {
+      addError(
+        `${relative} downloads with curl or wget. The plugin must not fetch the CLI. Point at the install docs instead.`
       );
     }
     start = end;
@@ -992,6 +999,9 @@ async function validatePluginFolderFiles(dir = pluginDir) {
   for (const entry of entries) {
     const entryPath = path.join(dir, entry.name);
     const relative = path.relative(repoRoot, entryPath);
+    if (INSTALL_SCRIPT.test(relative)) {
+      addError(`${relative} is an install script. The plugin must not ship one. Point at the install docs instead.`);
+    }
     if (entry.isSymbolicLink()) {
       addError(`${relative} is a symbolic link; ${PLUGIN_PATH}/ must hold regular files.`);
     } else if (entry.isDirectory()) {
