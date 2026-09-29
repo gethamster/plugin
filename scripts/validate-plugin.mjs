@@ -978,6 +978,32 @@ async function validateNoDownloadAndRun(filePath) {
   }
 }
 
+// The directory also flags a script body that downloads a file and then runs
+// that download, including marking it executable. The same-file check is what
+// caught the bundled installer after the pipe-to-shell form was gone: curl the
+// archive, then chmod +x and `"$INSTALL_DIR/$BINARY"`. The installer now
+// verifies the checksum and leaves the archive's mode alone.
+function validateNoFetchThenRun(filePath, text) {
+  if (!/\b(?:curl|wget)\b/.test(text)) {
+    return;
+  }
+  const relative = path.relative(repoRoot, filePath);
+  if (/\bchmod\b[^\n]*\+x/.test(text)) {
+    addError(
+      `${relative} downloads a file and marks something executable with chmod +x, which the Claude plugin directory flags as a download-and-execute pattern. Verify the checksum and keep the mode from the archive.`
+    );
+  }
+  if (
+    /(?:\$\(\s*|(?:^|[\n;&|])\s*(?:exec\s+)?)["']?\$(?:\{)?(?:INSTALL_DIR|work)(?:\})?\/\$(?:\{)?BINARY(?:\})?/.test(
+      text
+    )
+  ) {
+    addError(
+      `${relative} downloads a release and runs the binary from it, which the Claude plugin directory flags as a download-and-execute pattern. Stop after the checksum; setup runs hamster as its own next step.`
+    );
+  }
+}
+
 async function validatePluginFolderFiles(dir = pluginDir) {
   let entries;
   try {
@@ -1002,6 +1028,7 @@ async function validatePluginFolderFiles(dir = pluginDir) {
       addError(`${relative} is an image; keep listing images in the root assets/.`);
     } else {
       await validateNoDownloadAndRun(entryPath);
+      await validateNoFetchThenRun(entryPath, await fs.readFile(entryPath, "utf8"));
     }
   }
 }
