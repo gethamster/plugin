@@ -998,6 +998,9 @@ async function validatePluginFolderFiles(dir = pluginDir) {
       await validatePluginFolderFiles(entryPath);
     } else if (entryPath === PLUGIN_ICON) {
       await validatePluginIcon(entryPath);
+      // The icon is the one image the folder may hold, and it is still a file
+      // the directory scans. An SVG comment can carry a download-and-run line.
+      await validateNoDownloadAndRun(entryPath);
     } else if (IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
       addError(`${relative} is an image; keep listing images in the root assets/.`);
     } else {
