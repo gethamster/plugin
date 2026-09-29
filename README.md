@@ -99,7 +99,7 @@ Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to in
 ## After install
 
 1. **Talk** — hosted MCP at `https://tryhamster.com/mcp`, or `hamster chat` when MCP tools are unavailable and the CLI is signed in. Your client owns the Hamster sign-in.
-2. **Plan on disk** — say Install Hamster, or run ship. The setup skill installs the CLI if needed, signs you in with `hamster auth login` only when you aren't already signed in (asking before it opens a browser), and syncs the plan.
+2. **Plan on disk** — say Install Hamster, or run ship. The setup skill installs the CLI if needed, runs `hamster auth login`, and syncs the plan.
 3. **Ship** — execute the brief already on disk. Nothing runs automatically on session start.
 
 ## Skills
@@ -121,7 +121,7 @@ Four skills carry a `-hamster` suffix because Cursor invokes plugin skills as a 
 
 #### `/hamster:setup`
 
-The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is installed and you are signed in, it runs `hamster sync` to refresh the plan. Otherwise it installs the CLI, checks `hamster --no-tui status` and asks before opening a browser to sign in if you aren't signed in, and inits/syncs — only when you asked.
+The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is installed and you are signed in, it runs `hamster sync` to refresh the plan. Otherwise it installs the CLI, opens login, and inits/syncs — only when you asked.
 
 #### `/hamster:ask-hamster`
 
