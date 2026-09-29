@@ -1,17 +1,17 @@
 ---
 name: setup
-description: Sign in and sync the plan into this repo. If the Hamster CLI is missing, point the user at the install docs and stop. Use when the user says Install Hamster, first-run setup, or when ship/plan-hamster/resume-hamster report SETUP_NEEDED.
+description: Install the Hamster CLI, sign in, and sync the plan into this repo. Use when the user says Install Hamster, first-run setup, or when ship/plan-hamster/resume-hamster report SETUP_NEEDED.
 ---
 
 # Setup
 
 Make this workspace ready: Hamster CLI on PATH, user signed in, plan on disk in this repo's `.hamster/`.
 
-Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill signs in and syncs the local plan. It does not download or install the CLI.
+Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill is only for installing the CLI and getting the local plan.
 
 ## Readiness check
 
-Run the bundled gate. Set `SKILL_DIR` to the absolute path of the directory holding the SKILL.md you just read — the shell's working directory is the user's project, not this skill — and keep the whole command on one line with its statements `;`-separated, because some clients flatten a fenced block into a single line before running it. The `else` branch is the same gate inline, for clients that expose no readable path to the installed package. Neither branch installs anything, opens a browser, or downloads a file.
+Run the bundled gate. Set `SKILL_DIR` to the absolute path of the directory holding the SKILL.md you just read — the shell's working directory is the user's project, not this skill — and keep the whole command on one line with its statements `;`-separated, because some clients flatten a fenced block into a single line before running it. The `else` branch is the same gate inline, for clients that expose no readable path to the installed package. Neither branch installs, opens a browser, or calls curl.
 
 Unix:
 
@@ -26,11 +26,19 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 ```
 
 - Prints `READY` — the CLI is installed, you are signed in, and `hamster sync` succeeded. Stop.
-- Prints `SETUP_NEEDED` — if `hamster` is not on PATH (also look in `~/.hamster/bin`), stop. Tell the user to install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication and to come back when `hamster` is on PATH. Do not download a binary and do not run an installer. If this is Codex on macOS and `hamster` is already on PATH, re-run only this readiness command with elevated permission. The default workspace sandbox cannot read Keychain credentials, and an extra directory grant does not change that. If the elevated check prints `READY`, stop. Only if `hamster` is on PATH and it still prints `SETUP_NEEDED`, continue below.
+- Prints `SETUP_NEEDED` — if this is Codex on macOS and `hamster` is already on `PATH`, re-run only this readiness command with elevated permission. The default workspace sandbox cannot read Keychain credentials, and an extra directory grant does not change that. If the elevated check prints `READY`, stop. Only if it still prints `SETUP_NEEDED`, continue below.
 
 ## Install the CLI
 
-This skill does not install the CLI. If `hamster` is not on PATH (also look in `~/.hamster/bin`), stop and send the user to https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. That page is the install guide for every platform. Do not download a release archive and do not run an installer from this skill. When the user says the install is done, put `~/.hamster/bin` on PATH for this session and continue.
+If `hamster` is not on PATH (also look in `~/.hamster/bin`), run the bundled installer, with `SKILL_DIR` set as above:
+
+```bash
+SKILL_DIR="<absolute path of the directory containing this SKILL.md>"; bash "$SKILL_DIR/scripts/install-hamster-cli.sh"
+```
+
+It downloads the latest `hamster` release for this OS and architecture from GitHub, refuses to install unless the archive matches its published SHA256, and installs to `~/.hamster/bin`. It also edits shell and CLI config, so tell the user before running it: in whichever of `~/.zshrc` and `~/.bashrc` exist (creating the login shell's) it adds `~/.hamster/bin` to PATH and a `ham` alias and comments out stale task-master aliases; it removes an old `/usr/local/bin/hamster` if it can; and it sets `api_url` in `~/.hamster/config.yaml` to `https://tryhamster.com`, replacing any existing `api_url`. Pass every `[WARN]` line on to the user; each one names a fix to make by hand. If the script exits non-zero, report its `[ERROR]` line, which ends with the manual install steps when the download failed, and stop. If the script is not readable, or this is Windows, ask the user to download the binary for their platform from https://github.com/gethamster/plugin/releases/latest into `~/.hamster/bin`, then continue.
+
+Then put `~/.hamster/bin` on PATH for this session.
 
 ## Sign in
 

@@ -27,7 +27,7 @@ Windows:
 $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Test-Path "$SkillDir\scripts\ensure-ready.ps1") { pwsh "$SkillDir\scripts\ensure-ready.ps1" } else { $env:PATH = "$env:USERPROFILE\.hamster\bin;" + $env:PATH; if (Get-Command hamster -ErrorAction SilentlyContinue) { $status = & hamster --no-tui status 2>&1 | Out-String; if ($LASTEXITCODE -eq 0 -and $status -cmatch "Logged in") { $syncOut = & hamster sync 2>&1; if ($LASTEXITCODE -eq 0) { "READY" } else { [Console]::Error.WriteLine(($syncOut | Out-String).TrimEnd()); "SETUP_NEEDED"; exit 1 } } else { [Console]::Error.WriteLine($status.TrimEnd()); "SETUP_NEEDED"; exit 1 } } else { "SETUP_NEEDED"; exit 1 } }
 ```
 
-If `hamster` is not on PATH, stop. Tell the user to install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. Do not install it yourself. If this is Codex on macOS and `hamster` is on PATH, re-run this command with elevated permission (the sandbox cannot read Keychain). If that prints `READY`, continue. If it still prints `SETUP_NEEDED`, run `setup`, then re-check. Do not continue until it prints `READY`.
+If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`, re-run only this readiness command with elevated permission. The default workspace sandbox cannot read Keychain credentials, and an extra directory grant does not change that. If the elevated check prints `READY`, continue. Only if it still prints `SETUP_NEEDED`, run this plugin's `setup` skill, then re-run the check. Do not continue until it prints `READY`.
 
 ## Detect the Brief
 

@@ -1,9 +1,8 @@
-# Noninteractive readiness gate. No download. No browser.
+# Noninteractive readiness gate. No curl. No browser.
 $ErrorActionPreference = "Stop"
 $env:PATH = "$env:USERPROFILE\.hamster\bin;" + $env:PATH
 
 if (-not (Get-Command hamster -ErrorAction SilentlyContinue)) {
-  [Console]::Error.WriteLine("Install the Hamster CLI from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication and re-run setup.")
   Write-Output "SETUP_NEEDED"
   exit 1
 }

@@ -17,7 +17,7 @@ If Hamster MCP tools are unavailable, use `hamster chat` when the CLI is install
 hamster chat "<request>"
 ```
 
-For a genuine follow-up on that CLI path, use `hamster chat --continue "<follow-up>"`. If MCP is unavailable and the CLI is not ready, tell the user to finish the client's Hamster sign-in prompt, or to run this plugin's `setup` skill. If `hamster` is not on PATH, tell them to install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication and stop. Do not download a binary or run an installer.
+For a genuine follow-up on that CLI path, use `hamster chat --continue "<follow-up>"`. If MCP is unavailable and the CLI is not ready, tell the user to finish the client's Hamster sign-in prompt, or to run this plugin's `setup` skill, which installs the CLI and signs in when it isn't already.
 
 If `$ARGUMENTS` is empty, ask the user what they want to ask Hamster.
 

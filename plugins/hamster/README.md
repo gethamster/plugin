@@ -17,7 +17,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 
 | Skill | What it does |
 |-------|--------------|
-| `/hamster:setup` | Signs you in and syncs the plan into this repository's `.hamster/` folder. If the Hamster CLI is missing, it points you at the install docs and stops |
+| `/hamster:setup` | Installs the Hamster CLI if it is missing, signs you in, and syncs the plan into this repository's `.hamster/` folder |
 | `/hamster:ask-hamster` | Answers questions about your workspace's briefs, tasks, plans, and decisions, and performs workspace actions you ask for |
 | `/hamster:ship` | Executes a brief: branches, implements its tasks in parallel waves, validates, reviews, and commits. Opens a pull request only when you ask |
 | `/hamster:plan-hamster` | Read-only analysis of a brief, with optional founder or architecture review |
@@ -30,7 +30,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 
 Run `/hamster:setup` first. These prompts work against any Hamster workspace that has at least one brief with tasks.
 
-1. **Set up the repository.** `/hamster:setup` opens your browser to sign in and syncs your workspace's briefs and tasks into `.hamster/`. If the Hamster CLI is missing, it points you at the install docs and stops. It finishes when the readiness check prints `READY`.
+1. **Set up the repository.** `/hamster:setup` installs the Hamster CLI if it is missing, opens your browser to sign in, and syncs your workspace's briefs and tasks into `.hamster/`. It finishes when the readiness check prints `READY`.
 2. **Ask about your workspace.** `/hamster:ask-hamster Which briefs are in progress in this workspace, and what is blocking them?` Hamster answers from your workspace's briefs, tasks, and initiatives, with links back to Hamster Studio.
 3. **Plan a brief before building it.** `/hamster:plan-hamster` lists the briefs synced into `.hamster/`. Pick one, and it shows the brief's tasks as a dependency graph grouped into parallel waves. It changes no code and no task status.
 4. **Ship a brief.** `/hamster:ship <brief URL or slug>` shows the same wave plan and waits for you to confirm. It then creates a branch, implements each wave, runs your project's checks, reviews the changes, and commits. It pushes or opens a pull request only if you ask.
@@ -39,7 +39,7 @@ Run `/hamster:setup` first. These prompts work against any Hamster workspace tha
 ## What the plugin runs, sends, and fetches
 
 - **Hosted MCP server.** The plugin registers `https://tryhamster.com/mcp` as a remote HTTP MCP server. You sign in through Claude Code's own OAuth flow; the plugin never reads or passes an MCP token or key. Requests you make through the Hamster tools, and the workspace data they return, travel between Claude Code and Hamster.
-- **Hamster CLI.** The plugin does not download or install the CLI. If `hamster` is missing, `setup` and any skill that prints `SETUP_NEEDED` stop and point you at https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. The `ensure-ready` scripts only check that the CLI is installed and signed in, then run `hamster sync`.
+- **Hamster CLI.** The `setup` skill runs the bundled `skills/setup/scripts/install-hamster-cli.sh` only when the `hamster` command is missing. The script downloads the latest `hamster` release archive for your OS and architecture from GitHub Releases for gethamster/plugin, refuses to install unless it matches the SHA256 published beside it, and installs the binary to `~/.hamster/bin`. In whichever of `~/.zshrc` and `~/.bashrc` exist (it creates your login shell's), it adds that directory to PATH and a `ham` alias and comments out stale task-master aliases. It removes an old `/usr/local/bin/hamster` if it can, and sets `api_url` in `~/.hamster/config.yaml` to `https://tryhamster.com`, replacing any `api_url` already there.
 - **CLI commands.** Skills run `hamster auth login` (opens your browser to sign in; only when `hamster --no-tui status` shows you aren't signed in, and only after asking you), `hamster init` and `hamster sync` (write the plan to `.hamster/` in your repository), `hamster status`, `hamster chat` (sends your question to Hamster when MCP tools are unavailable), and `hamster task status` or `hamster brief status` (update status in Hamster Studio while `ship` runs). The bundled `ensure-ready` scripts only check that the CLI is installed and signed in, then run `hamster sync`. `hamster sync` also writes `.claude/skills/hamster-project-context/SKILL.md`, a guide to the synced files that the CLI fills in from a built-in template with your team name, the last sync time, and file counts.
 - **Background sync.** `ship` and `resume-hamster` keep the plan current during a run with `hamster sync --watch` in the background. They reuse a watcher already running for this repository, found with `pgrep` and `lsof`, and stop only a watcher they started.
 - **Team check.** `ship`, `plan-hamster`, and `resume-hamster` read `HAMSTER_ACCOUNT_ID`, if it is set, and compare it with the account in `.hamster/.state.json` on your machine; it is not sent anywhere. If the team doesn't match, they ask which team you mean and then run `hamster team switch --account-id <id>`, which clears the previous team's synced plan and syncs the new one.
@@ -49,8 +49,8 @@ Nothing runs automatically when a session starts: the plugin has no hooks.
 
 ## Troubleshooting
 
-- **A skill prints `SETUP_NEEDED`.** If `hamster` is missing, install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication, then run `/hamster:setup`. Setup signs you in and syncs. If `hamster` is already installed and it still prints `SETUP_NEEDED`, it shows the error from `hamster status` or `hamster sync`.
-- **`hamster: command not found` after you install the CLI.** The install docs put the CLI in `~/.hamster/bin` and add that folder to PATH in your shell profile. Open a new terminal, or run `export PATH="$HOME/.hamster/bin:$PATH"`.
+- **A skill prints `SETUP_NEEDED`.** Run `/hamster:setup`. It installs the CLI if it is missing, signs you in, and syncs. If it still prints `SETUP_NEEDED`, it shows the error from `hamster status` or `hamster sync`.
+- **`hamster: command not found` after setup.** The installer puts the CLI in `~/.hamster/bin` and adds that folder to PATH in your shell profile. Open a new terminal, or run `export PATH="$HOME/.hamster/bin:$PATH"`.
 - **Hamster tools are missing or ask you to sign in.** Open `/mcp`, select `plugin:hamster:hamster`, and authenticate. Until you do, `/hamster:ask-hamster` uses `hamster chat` when the CLI is signed in.
 - **"This repository's Hamster team isn't available to this MCP sign-in."** Your MCP sign-in and this repository's `.hamster/` belong to different teams. Run `hamster init --force` in the repository to pick the team again, or sign in to the Hamster MCP server as the user who belongs to this repository's team.
 - **A skill prints `ACCOUNT_UNRESOLVED`.** Run `hamster sync` in the repository. If the message says the team doesn't match, switch with `hamster team switch --account-id <team UUID>`, then run `hamster sync` again.

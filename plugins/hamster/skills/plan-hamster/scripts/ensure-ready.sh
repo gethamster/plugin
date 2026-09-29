@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Noninteractive readiness gate. No download. No browser.
+# Noninteractive readiness gate. No curl. No browser.
 set -eu
 
 export PATH="${HOME}/.hamster/bin:${PATH}"
 
 if ! command -v hamster >/dev/null 2>&1; then
-  printf '%s\n' "Install the Hamster CLI from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication and re-run setup." >&2
   echo "SETUP_NEEDED"
   exit 1
 fi
