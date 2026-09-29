@@ -30,7 +30,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 
 Run `/hamster:setup` first. These prompts work against any Hamster workspace that has at least one brief with tasks.
 
-1. **Set up the repository.** `/hamster:setup` installs the Hamster CLI if it is missing, opens your browser to sign in, and syncs your workspace's briefs and tasks into `.hamster/`. It finishes when the readiness check prints `READY`.
+1. **Set up the repository.** `/hamster:setup` installs the Hamster CLI if it is missing, asks before opening a browser to sign in when you are not already signed in, and syncs your workspace's briefs and tasks into `.hamster/`. It finishes when the readiness check prints `READY`.
 2. **Ask about your workspace.** `/hamster:ask-hamster Which briefs are in progress in this workspace, and what is blocking them?` Hamster answers from your workspace's briefs, tasks, and initiatives, with links back to Hamster Studio.
 3. **Plan a brief before building it.** `/hamster:plan-hamster` lists the briefs synced into `.hamster/`. Pick one, and it shows the brief's tasks as a dependency graph grouped into parallel waves. It changes no code and no task status.
 4. **Ship a brief.** `/hamster:ship <brief URL or slug>` shows the same wave plan and waits for you to confirm. It then creates a branch, implements each wave, runs your project's checks, reviews the changes, and commits. It pushes or opens a pull request only if you ask.

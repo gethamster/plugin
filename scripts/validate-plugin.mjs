@@ -26,11 +26,11 @@ const pluginNamePattern = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
 // plugin.yml derives the public plugin-v<version> git tag from this value, so a
 // malformed version must fail on the PR rather than when the tag job runs on main.
 const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
-// Without plugins/hamster/plugin.json, Antigravity stages the MCP server with an
-// empty command instead of the mcp_config.json URL. It keeps the Agent Plugins
-// field set. It must not declare
-// the Agent Plugins "$schema": once it does, Copilot CLI reads agents only from
-// com.github.copilot/agents/ and registers neither worker from agents/.
+// plugins/hamster/plugin.json is the manifest Antigravity reads. Without it,
+// Antigravity stages the MCP server with an empty command instead of the URL
+// in mcp_config.json. The file keeps the Agent Plugins fields. It must not
+// declare "$schema": with the Agent Plugins schema, Copilot CLI reads agents
+// only from com.github.copilot/agents/ and registers neither worker.
 const pluginManifestFields = new Set([
   "name",
   "version",
