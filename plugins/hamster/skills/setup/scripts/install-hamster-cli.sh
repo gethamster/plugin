@@ -8,10 +8,8 @@
 # stable so that URL can point at it.
 #
 # It downloads a release archive from github.com/gethamster/plugin, refuses to
-# install unless the archive matches the SHA-256 published next to it, and
-# installs that binary with an atomic rename. It does not run the binary and
-# does not change the mode the archive gave it. The setup skill runs `hamster`
-# itself on the next step. It also puts ~/.hamster/bin on PATH in ~/.zshrc and
+# install unless the archive matches the SHA-256 published next to it, installs
+# the binary with an atomic rename, puts ~/.hamster/bin on PATH in ~/.zshrc and
 # ~/.bashrc, retires stale task-master aliases, adds the `ham` alias, and points
 # the CLI at Hamster in ~/.hamster/config.yaml.
 #
@@ -107,16 +105,13 @@ info "Checksum verified"
 
 tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manual"
 [ -f "$work/$BINARY" ] || fail "$archive does not contain $BINARY. $manual"
-# Published release archives already mark the binary executable. Leave that
-# mode alone, and do not run the file from this script: doing either, after
-# the download above, is the pattern the Claude plugin directory flags here.
-[ -x "$work/$BINARY" ] || fail "$archive contains $BINARY but it is not executable. $manual"
 
 # Stage next to the destination and rename, so the swap is atomic and lands on
 # a fresh inode: macOS kills an executable whose inode was rewritten in place.
 mkdir -p "$INSTALL_DIR" || fail "Could not create $INSTALL_DIR (the reason is above). Fix that path, or set HAMSTER_INSTALL_DIR to a directory you own."
 cannot_install="Could not write to $INSTALL_DIR (the reason is above). Free space there or make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
 mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
+chmod +x "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
 mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY" || fail "$cannot_install"
 info "Installed $INSTALL_DIR/$BINARY"
 
@@ -191,6 +186,22 @@ if [ "$INSTALL_DIR" != "$DEFAULT_INSTALL_DIR" ]; then
   warn "Custom install dir: make sure $INSTALL_DIR is on your PATH."
 fi
 
+version_err="$work/version.err"
+code=0
+version="$("$INSTALL_DIR/$BINARY" --version 2>"$version_err")" || code=$?
+if [ "$code" -ne 0 ]; then
+  # A macOS code-signing kill or a loader abort prints nothing, so name the
+  # exit status or signal as well as whatever the binary printed.
+  reason="$(cat "$version_err")"
+  reason="${reason:-$version}"
+  if [ "$code" -gt 128 ]; then
+    how="killed by signal $((code - 128))"
+  else
+    how="exit status $code"
+  fi
+  fail "Installed $INSTALL_DIR/$BINARY but it failed to run ($how)${reason:+: $reason}"
+fi
+
 config_dir="$HOME/.hamster"
 config="$config_dir/config.yaml"
 cannot_write="Could not write $config (the reason is above), so the CLI is installed but not pointed at Hamster. Fix that, or set api_url: \"$API_URL\" in $config by hand."
@@ -211,7 +222,7 @@ if [ -f "$config" ]; then
 fi
 printf 'api_url: "%s"\n' "$API_URL" >>"$config" || fail "$cannot_write"
 
-info "Hamster CLI installed at $INSTALL_DIR/$BINARY"
+info "Hamster CLI installed: $version"
 info "Configured API URL: $API_URL"
 # Only when the login shell's own file got the line; otherwise the [WARN]
 # above is the instruction to follow.

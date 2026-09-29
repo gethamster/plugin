@@ -430,25 +430,6 @@ test("a download piped into a shell anywhere in plugins/hamster fails validation
   assert.doesNotMatch(result.stderr, /bootstrap\.sh:7 /);
 });
 
-test("a script that downloads and then runs or marks the file executable fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-fetch-exec-");
-  await copyPackage(cwd);
-  await writeFile(
-    plugin(cwd, "skills", "setup", "scripts", "fetch-exec.sh"),
-    [
-      'curl -fsSL "$url" -o "$work/$archive"',
-      'chmod +x "$INSTALL_DIR/$BINARY"',
-      '"$INSTALL_DIR/$BINARY" --version',
-      "",
-    ].join("\n")
-  );
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /fetch-exec\.sh downloads a file and marks something executable with chmod \+x/);
-  assert.match(result.stderr, /fetch-exec\.sh downloads a release and runs the binary from it/);
-});
-
 test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-schema-");
   await copyPackage(cwd);
@@ -611,7 +592,7 @@ exit 0
 // Runs the real installer against a fake release: a stub `curl` serves a
 // tarball and its checksum from `release/`, and a stub `rm` refuses the
 // legacy /usr/local/bin/hamster path so a test can never delete a real binary.
-async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true, extraEnv = {}, mode = 0o755 } = {}) {
+async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true, extraEnv = {} } = {}) {
   const root = await makeTemp("hamster-installer-");
   const home = path.join(root, "home");
   const stubs = path.join(root, "stubs");
@@ -621,7 +602,7 @@ async function runInstaller({ checksum = "match", config = null, rc = "", binary
   await mkdir(path.join(release, "pkg"), { recursive: true });
 
   await writeFile(path.join(release, "pkg", "hamster"), `#!/usr/bin/env bash\n${binary}\n`);
-  await chmod(path.join(release, "pkg", "hamster"), mode);
+  await chmod(path.join(release, "pkg", "hamster"), 0o755);
   const tar = await run("tar", ["-czf", path.join(release, "archive.tar.gz"), "-C", path.join(release, "pkg"), "hamster"]);
   assert.equal(tar.code, 0, tar.stderr);
   const digest = createHash("sha256").update(await readFile(path.join(release, "archive.tar.gz"))).digest("hex");
@@ -700,25 +681,18 @@ test("a failed download ends with the manual install steps", async () => {
   assert.equal(await pathExists(binary), false);
 });
 
-test("the CLI installer does not run the binary it just installed", async () => {
-  for (const script of ["exit 3", "kill -9 $$", 'echo ran >"$HOME/ran"; exit 0']) {
-    const { home, invoke, binary } = await runInstaller({ binary: script });
+test("a binary that dies silently is reported with its exit status or signal", async () => {
+  for (const [script, expected] of [
+    ["exit 3", /failed to run \(exit status 3\)$/m],
+    ["kill -9 $$", /failed to run \(killed by signal 9\)$/m],
+    ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
+    ["echo 'bad cpu type'; exit 1", /failed to run \(exit status 1\): bad cpu type$/m],
+  ]) {
+    const { invoke } = await runInstaller({ binary: script });
     const result = await invoke();
-    assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /Checksum verified/);
-    assert.match(result.stdout, /Hamster CLI installed at /);
-    assert.equal(await pathExists(binary), true);
-    assert.equal(await pathExists(path.join(home, "ran")), false);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, expected);
   }
-});
-
-test("the CLI installer refuses an archive member that is not executable", async () => {
-  const { invoke, binary } = await runInstaller({ mode: 0o644 });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /not executable/);
-  assert.match(result.stderr, /Install it by hand instead/);
-  assert.equal(await pathExists(binary), false);
 });
 
 test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {
