@@ -15,14 +15,23 @@ import process from "node:process";
 import { syncAdapters } from "./sync-adapters.mjs";
 
 const repoRoot = process.cwd();
+// Every client installs this one folder. The repository root holds only the
+// marketplace catalogs that point at it, plus maintainer tooling.
+const PLUGIN_PATH = "plugins/hamster";
+const PLUGIN_SOURCE = `./${PLUGIN_PATH}`;
+const pluginDir = path.join(repoRoot, PLUGIN_PATH);
 const errors = [];
 
 const pluginNamePattern = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
 // plugin.yml derives the public plugin-v<version> git tag from this value, so a
 // malformed version must fail on the PR rather than when the tag job runs on main.
 const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
-const rootPluginFields = new Set([
-  "$schema",
+// plugins/hamster/plugin.json is the manifest Antigravity reads. Without it,
+// Antigravity stages the MCP server with an empty command instead of the URL
+// in mcp_config.json. The file keeps the Agent Plugins fields. It must not
+// declare "$schema": with the Agent Plugins schema, Copilot CLI reads agents
+// only from com.github.copilot/agents/ and registers neither worker.
+const pluginManifestFields = new Set([
   "name",
   "version",
   "description",
@@ -194,7 +203,7 @@ function requireVersionParity(context, actual, rootVersion) {
     return;
   }
   if (rootVersion && actual !== rootVersion) {
-    addError(`${context} version "${actual}" does not match root "${rootVersion}".`);
+    addError(`${context} version "${actual}" does not match ${PLUGIN_PATH}/plugin.json "${rootVersion}".`);
   }
 }
 
@@ -245,40 +254,42 @@ async function validateAgents(pluginDir, pluginName) {
   }
 }
 
-async function validateRootPlugin() {
-  const manifestPath = path.join(repoRoot, "plugin.json");
-  const manifest = await readJsonFile(manifestPath, "Root plugin.json");
+async function validateAgentPluginsManifest() {
+  const manifestPath = path.join(pluginDir, "plugin.json");
+  const manifest = await readJsonFile(manifestPath, `${PLUGIN_PATH}/plugin.json`);
   if (!manifest) {
     return null;
   }
 
   for (const key of Object.keys(manifest)) {
-    if (!rootPluginFields.has(key)) {
-      addError(`Root plugin.json has non-Agent-Plugins field "${key}".`);
+    if (key === "$schema") {
+      addError(`${PLUGIN_PATH}/plugin.json must not declare "$schema"; with it, Copilot CLI stops registering agents/.`);
+    } else if (!pluginManifestFields.has(key)) {
+      addError(`${PLUGIN_PATH}/plugin.json has non-Agent-Plugins field "${key}".`);
     }
   }
 
   if (typeof manifest.name !== "string" || !pluginNamePattern.test(manifest.name)) {
-    addError('Root plugin.json "name" must be lowercase kebab-case.');
+    addError(`${PLUGIN_PATH}/plugin.json "name" must be lowercase kebab-case.`);
   } else if (manifest.name !== "hamster") {
-    addError(`Root plugin.json name must be "hamster", got "${manifest.name}".`);
+    addError(`${PLUGIN_PATH}/plugin.json name must be "hamster", got "${manifest.name}".`);
   }
 
   if (typeof manifest.version !== "string" || manifest.version.length === 0) {
-    addError('Root plugin.json "version" is required.');
+    addError(`${PLUGIN_PATH}/plugin.json "version" is required.`);
   } else if (!pluginVersionPattern.test(manifest.version)) {
-    addError(`Root plugin.json "version" must be semver-like, got "${manifest.version}".`);
+    addError(`${PLUGIN_PATH}/plugin.json "version" must be semver-like, got "${manifest.version}".`);
   }
 
   if (manifest.license !== "MIT") {
-    addError('Root plugin.json "license" must be "MIT".');
+    addError(`${PLUGIN_PATH}/plugin.json "license" must be "MIT".`);
   }
 
   return manifest;
 }
 
-function isRepoRootSource(value) {
-  return value === "." || value === "./";
+function isPluginSource(value) {
+  return value === PLUGIN_SOURCE || value === PLUGIN_PATH;
 }
 
 function validateMarketplaceEntry(context, entry, version) {
@@ -286,8 +297,8 @@ function validateMarketplaceEntry(context, entry, version) {
     addError(`${context} plugins[0].name must be "hamster".`);
     return;
   }
-  if (!isRepoRootSource(entry.source)) {
-    addError(`${context} plugins[0].source must resolve to "./", got ${JSON.stringify(entry.source)}.`);
+  if (!isPluginSource(entry.source)) {
+    addError(`${context} plugins[0].source must be "${PLUGIN_SOURCE}", got ${JSON.stringify(entry.source)}.`);
   }
   if (entry.license !== "MIT") {
     addError(`${context} plugin license must be "MIT".`);
@@ -299,6 +310,7 @@ function validateMarketplaceEntry(context, entry, version) {
 // owner, metadata, plugins) and per plugin entry (name, source, description,
 // minClientVersions); only metadata is open. Everything else lives in
 // .cursor-plugin/plugin.json, which Cursor merges over the entry.
+const REPO_ASSET_URL = "https://raw.githubusercontent.com/gethamster/plugin/main/";
 const cursorMarketplaceFields = new Set(["name", "owner", "metadata", "plugins"]);
 const cursorMarketplaceEntryFields = new Set(["name", "source", "description", "minClientVersions"]);
 
@@ -315,10 +327,8 @@ async function validateCursor(version) {
     if (!entry || entry.name !== "hamster") {
       addError('Cursor marketplace.json plugins[0].name must be "hamster".');
     } else {
-      if (!isRepoRootSource(entry.source)) {
-        addError(
-          `Cursor marketplace.json plugins[0].source must resolve to "./", got ${JSON.stringify(entry.source)}.`
-        );
+      if (!isPluginSource(entry.source)) {
+        addError(`Cursor marketplace.json plugins[0].source must be "${PLUGIN_SOURCE}", got ${JSON.stringify(entry.source)}.`);
       }
       if (typeof entry.description !== "string" || entry.description.length === 0) {
         addError("Cursor marketplace.json plugins[0].description is required.");
@@ -332,7 +342,7 @@ async function validateCursor(version) {
     requireVersionParity("Cursor marketplace.json metadata", marketplace.metadata?.version, version);
   }
 
-  const manifestPath = path.join(repoRoot, ".cursor-plugin", "plugin.json");
+  const manifestPath = path.join(pluginDir, ".cursor-plugin", "plugin.json");
   const manifest = await readJsonFile(manifestPath, "Cursor plugin manifest");
   if (!manifest) {
     return;
@@ -344,28 +354,31 @@ async function validateCursor(version) {
     addError('Cursor plugin.json must include a non-empty "displayName".');
   }
 
-  if (typeof manifest.logo !== "string" || manifest.logo.length === 0) {
-    addError('Cursor plugin.json must include "logo".');
+  // The logo stays out of plugins/hamster, so it is a URL to the root assets/.
+  if (typeof manifest.logo !== "string" || !manifest.logo.startsWith(REPO_ASSET_URL)) {
+    addError(`Cursor plugin.json "logo" must be a URL under ${REPO_ASSET_URL}.`);
   } else {
-    await validateReferencedPath(repoRoot, "logo", manifest.logo, "cursor");
+    await validateReferencedPath(repoRoot, "logo", manifest.logo.slice(REPO_ASSET_URL.length), "cursor");
   }
 
   if (manifest.license !== "MIT") {
     addError('Cursor plugin.json "license" must be "MIT".');
   }
 
-  // Cursor loads MCP from the root dialect files, so an inline pointer here is
-  // a second source of truth for the same endpoint. Claude and Codex are
-  // asserted to carry the pointer; Cursor is asserted not to.
-  if (manifest.mcpServers !== undefined) {
-    addError("Cursor plugin.json must not include mcpServers.");
+  // Cursor loads mcp.json unless this manifest sets mcpServers. plugins/hamster/
+  // has no mcp.json, so the pointer has to be ./.mcp.json and that file has to
+  // exist. Claude and Codex carry the same pointer.
+  if (manifest.mcpServers !== "./.mcp.json") {
+    addError('Cursor plugin.json must set mcpServers to "./.mcp.json".');
+  } else if (!(await pathExists(path.join(pluginDir, ".mcp.json")))) {
+    addError("Cursor plugin.json mcpServers points at a missing .mcp.json.");
   }
 
   requireVersionParity("Cursor plugin.json", manifest.version, version);
 }
 
 async function validateClaude(version) {
-  const manifestPath = path.join(repoRoot, ".claude-plugin", "plugin.json");
+  const manifestPath = path.join(pluginDir, ".claude-plugin", "plugin.json");
   const manifest = await readJsonFile(manifestPath, "Claude plugin manifest");
   if (manifest) {
     requireHamsterName("Claude plugin.json", manifest.name);
@@ -381,7 +394,30 @@ async function validateClaude(version) {
     if (manifest.license !== "MIT") {
       addError('Claude plugin.json "license" must be "MIT".');
     }
+    // privacyPolicyUrl is not in Claude Code's manifest schema. The directory
+    // warns UNKNOWN_KEY on it and says Claude Code ignores the key at load
+    // time. The same check accepts a Privacy link in the plugin README, which
+    // is what plugins/hamster/README.md carries. Putting the key back brings
+    // the warning back.
+    if (Object.prototype.hasOwnProperty.call(manifest, "privacyPolicyUrl")) {
+      addError(
+        'Claude plugin.json must not set "privacyPolicyUrl". Link the policy from plugins/hamster/README.md instead.',
+      );
+    }
     requireVersionParity("Claude plugin.json", manifest.version, version);
+  }
+
+  const readmePath = path.join(pluginDir, "README.md");
+  let readme = "";
+  try {
+    readme = await fs.readFile(readmePath, "utf8");
+  } catch {
+    addError("plugins/hamster/README.md is missing, so the privacy policy link is missing.");
+  }
+  if (readme && !/\[[^\]]*Privacy[^\]]*\]\(https:\/\/[^)\s]+\)/i.test(readme)) {
+    addError(
+      'plugins/hamster/README.md must include a Markdown link whose text contains "Privacy" and whose URL is https.',
+    );
   }
 
   const marketplacePath = path.join(repoRoot, ".claude-plugin", "marketplace.json");
@@ -410,8 +446,8 @@ async function validateCodexCatalog(manifestCategory) {
   }
 
   const source = entry.source;
-  if (!source || source.source !== "local" || !isRepoRootSource(source.path)) {
-    addError('.agents/plugins/marketplace.json plugins[0].source must be { source: "local", path: "./" }.');
+  if (!source || source.source !== "local" || !isPluginSource(source.path)) {
+    addError(`.agents/plugins/marketplace.json plugins[0].source must be { source: "local", path: "${PLUGIN_SOURCE}" }.`);
   }
 
   if (typeof catalog.interface?.displayName !== "string" || catalog.interface.displayName.length === 0) {
@@ -462,6 +498,17 @@ const codexListing = {
   defaultPrompt: { max: 3, chars: 128 },
 };
 
+// Marketplace installs resolve these inside the plugin folder. The skills-only
+// zip still copies the same three files once from the root assets/.
+const CODEX_LISTING_IMAGES = {
+  composerIcon: "./assets/icon.png",
+  logo: "./assets/logo.png",
+  logoDark: "./assets/logo-dark.png",
+};
+const CODEX_LISTING_IMAGE_PATHS = new Set(
+  Object.values(CODEX_LISTING_IMAGES).map((relative) => path.join(pluginDir, relative.slice(2)))
+);
+
 function codexError(field, message) {
   addError(`Codex plugin.json interface.${field} ${message}`);
 }
@@ -476,14 +523,6 @@ function requireCodexText(field, value, { chars, multiline = false }) {
   }
   if (!multiline && /[\r\n]/.test(value)) {
     codexError(field, "must fit on one line.");
-  }
-  return true;
-}
-
-function requireCodexPath(field, value) {
-  if (typeof value !== "string" || value.length === 0) {
-    codexError(field, "must be a non-empty path.");
-    return false;
   }
   return true;
 }
@@ -511,16 +550,6 @@ function requireCodexHttpsUrl(field, value) {
   }
 }
 
-async function requireCodexAsset(field, value) {
-  if (!requireCodexPath(field, value)) {
-    return;
-  }
-  if (!value.startsWith("./")) {
-    codexError(field, `must start with "./", got "${value}".`);
-  }
-  await validateReferencedPath(repoRoot, `interface.${field}`, value, "codex");
-}
-
 async function validateCodexInterface(iface) {
   for (const field of ["displayName", "developerName", "shortDescription", "longDescription"]) {
     requireCodexText(field, iface[field], codexListing[field]);
@@ -545,6 +574,9 @@ async function validateCodexInterface(iface) {
     if (prompt.includes("@")) {
       codexError(`defaultPrompt[${index}]`, 'must not mention another plugin with "@".');
     }
+    if (/https?:\/\//i.test(prompt)) {
+      codexError(`defaultPrompt[${index}]`, "must not send the agent to a URL; name a bundled skill such as $hamster:setup instead.");
+    }
     const normalized = prompt.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
     if (seenPrompts.has(normalized)) {
       codexError(`defaultPrompt[${index}]`, "duplicates an earlier prompt.");
@@ -562,16 +594,39 @@ async function validateCodexInterface(iface) {
     }
   }
 
-  for (const field of ["logo", "composerIcon"]) {
-    await requireCodexAsset(field, iface[field]);
+  // Exactly the three listing images, at the paths Codex resolves inside the
+  // installed plugin folder. screenshots stay unset: a skills-only upload rejects
+  // them, and any other image path is still a bundled image held for review.
+  for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
+    if (iface[field] !== expected) {
+      codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
+      continue;
+    }
+    const pluginFile = path.join(pluginDir, expected.slice(2));
+    const rootFile = path.join(repoRoot, expected.slice(2));
+    let pluginBytes;
+    let rootBytes;
+    try {
+      pluginBytes = await fs.readFile(pluginFile);
+      rootBytes = await fs.readFile(rootFile);
+    } catch (error) {
+      if (isNotFound(error)) {
+        codexError(field, `file ${path.relative(repoRoot, pluginFile)} must exist and match the root assets/ copy.`);
+        continue;
+      }
+      throw error;
+    }
+    if (!pluginBytes.equals(rootBytes)) {
+      codexError(field, `file ${path.relative(repoRoot, pluginFile)} must match root ${expected.slice(2)} byte for byte.`);
+    }
   }
-  if (iface.logoDark !== undefined) {
-    await requireCodexAsset("logoDark", iface.logoDark);
+  if (iface.screenshots !== undefined) {
+    codexError("screenshots", "must not be set; a skills-only bundle excludes screenshots.");
   }
 }
 
 async function validateCodex(version) {
-  const manifestPath = path.join(repoRoot, ".codex-plugin", "plugin.json");
+  const manifestPath = path.join(pluginDir, ".codex-plugin", "plugin.json");
   const manifest = await readJsonFile(manifestPath, "Codex plugin manifest");
   if (!manifest) {
     return;
@@ -610,31 +665,24 @@ async function validateCodex(version) {
 async function validateMcpFiles() {
   const urls = new Map();
 
-  const config = await readJsonFile(path.join(repoRoot, "mcp_config.json"), "Root mcp_config.json");
+  // Antigravity reads mcp_config.json. Claude Code, Codex, Copilot CLI, and
+  // Grok Build read .mcp.json. Cursor does not: it loads mcp.json unless
+  // .cursor-plugin/plugin.json sets mcpServers to "./.mcp.json".
+  const config = await readJsonFile(path.join(pluginDir, "mcp_config.json"), `${PLUGIN_PATH}/mcp_config.json`);
   if (config) {
     const serverUrl = config.mcpServers?.hamster?.serverUrl;
     if (typeof serverUrl !== "string" || serverUrl.length === 0) {
-      addError("Root mcp_config.json must set mcpServers.hamster.serverUrl.");
+      addError("mcp_config.json must set mcpServers.hamster.serverUrl.");
     } else {
       urls.set("mcp_config.json", serverUrl);
     }
   }
 
-  const agentPlugins = await readJsonFile(path.join(repoRoot, "mcp.json"), "Root mcp.json");
-  if (agentPlugins) {
-    const server = agentPlugins.mcpServers?.hamster;
-    if (server?.type !== "streamable-http" || typeof server?.url !== "string" || server.url.length === 0) {
-      addError('Root mcp.json must set mcpServers.hamster to { type: "streamable-http", url }.');
-    } else {
-      urls.set("mcp.json", server.url);
-    }
-  }
-
-  const claudeCodex = await readJsonFile(path.join(repoRoot, ".mcp.json"), "Root .mcp.json");
+  const claudeCodex = await readJsonFile(path.join(pluginDir, ".mcp.json"), `${PLUGIN_PATH}/.mcp.json`);
   if (claudeCodex) {
     const server = claudeCodex.mcpServers?.hamster;
     if (server?.type !== "http" || typeof server?.url !== "string" || server.url.length === 0) {
-      addError('Root .mcp.json must set mcpServers.hamster to { type: "http", url }.');
+      addError('.mcp.json must set mcpServers.hamster to { type: "http", url }.');
     } else {
       urls.set(".mcp.json", server.url);
     }
@@ -654,7 +702,7 @@ async function validateMcpFiles() {
 async function validateDescriptionParity() {
   const descriptions = new Map();
   for (const file of ["plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
-    const manifest = await readJsonFile(path.join(repoRoot, file), file);
+    const manifest = await readJsonFile(path.join(pluginDir, file), file);
     if (manifest && typeof manifest.description === "string") {
       descriptions.set(file, manifest.description);
     }
@@ -672,7 +720,7 @@ async function validateNoAntigravityNest() {
   // package that root installs replaced.
   for (const nestRoot of [".agents", "_agents"]) {
     if (await pathExists(path.join(repoRoot, nestRoot, "plugins", "hamster"))) {
-      addError(`Delete ${nestRoot}/plugins/hamster; agy installs the repo root.`);
+      addError(`Delete ${nestRoot}/plugins/hamster; agy installs ${PLUGIN_PATH}.`);
     }
   }
 }
@@ -682,25 +730,26 @@ async function validateNoAntigravityNest() {
 // duplicated instead, and these groups keep the copies byte-identical.
 const DUPLICATE_GROUPS = [
   [
-    "skills/setup/scripts/ensure-ready.sh",
-    "skills/ship/scripts/ensure-ready.sh",
-    "skills/plan-hamster/scripts/ensure-ready.sh",
-    "skills/resume-hamster/scripts/ensure-ready.sh",
+    "plugins/hamster/skills/setup/scripts/ensure-ready.sh",
+    "plugins/hamster/skills/ship/scripts/ensure-ready.sh",
+    "plugins/hamster/skills/plan-hamster/scripts/ensure-ready.sh",
+    "plugins/hamster/skills/resume-hamster/scripts/ensure-ready.sh",
   ],
   [
-    "skills/setup/scripts/ensure-ready.ps1",
-    "skills/ship/scripts/ensure-ready.ps1",
-    "skills/plan-hamster/scripts/ensure-ready.ps1",
-    "skills/resume-hamster/scripts/ensure-ready.ps1",
+    "plugins/hamster/skills/setup/scripts/ensure-ready.ps1",
+    "plugins/hamster/skills/ship/scripts/ensure-ready.ps1",
+    "plugins/hamster/skills/plan-hamster/scripts/ensure-ready.ps1",
+    "plugins/hamster/skills/resume-hamster/scripts/ensure-ready.ps1",
   ],
   [
-    "skills/ship/references/brief-selection.md",
-    "skills/plan-hamster/references/brief-selection.md",
-    "skills/resume-hamster/references/brief-selection.md",
+    "plugins/hamster/skills/ship/references/brief-selection.md",
+    "plugins/hamster/skills/plan-hamster/references/brief-selection.md",
+    "plugins/hamster/skills/resume-hamster/references/brief-selection.md",
   ],
-  ["skills/ship/references/execution-loop.md", "skills/resume-hamster/references/execution-loop.md"],
-  ["skills/ship/references/agents/task-executor.md", "skills/resume-hamster/references/agents/task-executor.md"],
-  ["skills/ship/references/agents/wave-reviewer.md", "skills/resume-hamster/references/agents/wave-reviewer.md"],
+  ["plugins/hamster/skills/ship/references/execution-loop.md", "plugins/hamster/skills/resume-hamster/references/execution-loop.md"],
+  ["plugins/hamster/skills/ship/references/agents/task-executor.md", "plugins/hamster/skills/resume-hamster/references/agents/task-executor.md"],
+  ["plugins/hamster/skills/ship/references/agents/wave-reviewer.md", "plugins/hamster/skills/resume-hamster/references/agents/wave-reviewer.md"],
+  ["LICENSE", "plugins/hamster/LICENSE"],
 ];
 
 const skillDirReferencePattern = /\$SKILL_DIR\/([A-Za-z0-9._/-]+)/g;
@@ -708,7 +757,7 @@ const skillDirReferencePatternPowerShell = /\$SkillDir\\([A-Za-z0-9._\\-]+)/g;
 const localMarkdownLinkPattern = /\]\(((?:references|scripts)\/[^)\s]+)\)/g;
 
 async function listSkillMdFiles() {
-  const skillsDir = path.join(repoRoot, "skills");
+  const skillsDir = path.join(pluginDir, "skills");
   if (!(await pathExists(skillsDir))) {
     return [];
   }
@@ -808,12 +857,12 @@ async function validateSkillSizeBudget() {
 async function validateLayout() {
   await validateMcpFiles();
 
-  if (await pathExists(path.join(repoRoot, "hooks"))) {
-    addError("hooks/ must not exist.");
+  if (await pathExists(path.join(pluginDir, "hooks"))) {
+    addError(`${PLUGIN_PATH}/hooks/ must not exist.`);
   }
 
-  if (await pathExists(path.join(repoRoot, "bin"))) {
-    addError("top-level bin/ must not exist.");
+  if (await pathExists(path.join(pluginDir, "bin"))) {
+    addError(`${PLUGIN_PATH}/bin/ must not exist.`);
   }
 
   const licensePath = path.join(repoRoot, "LICENSE");
@@ -826,8 +875,151 @@ async function validateLayout() {
     }
   }
 
-  await validateSkills(repoRoot, "hamster");
-  await validateAgents(repoRoot, "hamster");
+  await validateSkills(pluginDir, "hamster");
+  await validateAgents(pluginDir, "hamster");
+}
+
+// A plugin manifest or component at the repository root turns clients back to
+// a root install: agy then skips plugins/ and installs 0 skills while still
+// reporting [ok].
+const ROOT_PLUGIN_ENTRIES = [
+  "plugin.json",
+  "gemini-extension.json",
+  ".claude-plugin/plugin.json",
+  ".cursor-plugin/plugin.json",
+  ".codex-plugin",
+  ".mcp.json",
+  "mcp.json",
+  "mcp_config.json",
+  "skills",
+  "agents",
+  "com.github.copilot",
+];
+
+async function validateRootHasNoPlugin() {
+  for (const entry of ROOT_PLUGIN_ENTRIES) {
+    if (await pathExists(path.join(repoRoot, entry))) {
+      addError(`${entry} must not exist at the repository root; it belongs in ${PLUGIN_PATH}/.`);
+    }
+  }
+
+  // Beside the marketplace catalogs, .grok-plugin/plugin.json is the one plugin
+  // manifest the root may hold. Any other <client>-plugin/plugin.json there
+  // turns that client (or agy) back to a root install.
+  for (const entry of await fs.readdir(repoRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !/^\.[A-Za-z0-9_-]+-plugin$/.test(entry.name) || entry.name === ".grok-plugin") {
+      continue;
+    }
+    const manifest = path.join(entry.name, "plugin.json");
+    if (!ROOT_PLUGIN_ENTRIES.includes(manifest) && (await pathExists(path.join(repoRoot, manifest)))) {
+      addError(`${manifest} must not exist at the repository root; only .grok-plugin/plugin.json may.`);
+    }
+  }
+}
+
+// `grok plugin install gethamster/plugin` reads only a manifest at the source
+// root, so .grok-plugin/plugin.json points Grok into the plugin folder.
+// sync-adapters.mjs keeps its name, version, and description in step; this
+// checks that each component path resolves to the plugin's real files.
+async function validateGrokRootManifest() {
+  const manifest = await readJsonFile(path.join(repoRoot, ".grok-plugin", "plugin.json"), ".grok-plugin/plugin.json");
+  if (!manifest) {
+    return;
+  }
+  const expected = {
+    skills: { target: `./${PLUGIN_PATH}/skills`, kind: "directory" },
+    agents: { target: `./${PLUGIN_PATH}/agents`, kind: "directory" },
+    mcpServers: { target: `./${PLUGIN_PATH}/.mcp.json`, kind: "file" },
+  };
+  for (const [field, { target, kind }] of Object.entries(expected)) {
+    const value = manifest[field];
+    if (value !== target) {
+      addError(`.grok-plugin/plugin.json ${field} must be the ${kind} path "${target}", got ${JSON.stringify(value)}.`);
+      continue;
+    }
+    let info;
+    try {
+      info = await fs.stat(path.join(repoRoot, value));
+    } catch (error) {
+      if (!isNotFound(error)) {
+        throw error;
+      }
+    }
+    if (!info || (kind === "directory" ? !info.isDirectory() : !info.isFile())) {
+      addError(`.grok-plugin/plugin.json ${field} points at ${value}, which is not a ${kind}.`);
+    }
+  }
+}
+
+// The Claude plugin directory refuses symbolic links in what a plugin loads and
+// holds a plugin whose files refer to bundled images. The Codex marketplace
+// card is the exception under test: composerIcon, logo, and logoDark are the
+// three PNGs in plugins/hamster/assets/, byte-identical to the root assets/.
+// .claude-plugin/icon.svg stays allowed too: SVG is text the scan can read, so
+// it is allowed as long as it pulls in no raster, script, or external resource.
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"]);
+const PLUGIN_ICON = path.join(pluginDir, ".claude-plugin", "icon.svg");
+
+async function validatePluginIcon(iconPath) {
+  const relative = path.relative(repoRoot, iconPath);
+  const svg = await fs.readFile(iconPath, "utf8");
+  if (svg.includes("\u0000") || svg.includes("\uFFFD")) {
+    addError(`${relative} must be UTF-8 text.`);
+    return;
+  }
+  if (!/^\s*(?:<\?xml[^>]*\?>\s*)?<svg[\s>]/.test(svg)) {
+    addError(`${relative} must be an SVG document starting with <svg>.`);
+  }
+  if (/<(?:image|script|foreignObject)\b/i.test(svg)) {
+    addError(`${relative} must not contain <image>, <script>, or <foreignObject>.`);
+  }
+  if (/\bhref\s*=\s*["']\s*(?!#)/i.test(svg)) {
+    addError(`${relative} must not reference external resources; only #fragment hrefs are allowed.`);
+  }
+}
+
+async function validatePluginFolderFiles(dir = pluginDir) {
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch (error) {
+    if (isNotFound(error)) {
+      addError(`${path.relative(repoRoot, dir)}/ is missing.`);
+      return;
+    }
+    throw error;
+  }
+  for (const entry of entries) {
+    const entryPath = path.join(dir, entry.name);
+    const relative = path.relative(repoRoot, entryPath);
+    if (entry.isSymbolicLink()) {
+      addError(`${relative} is a symbolic link; ${PLUGIN_PATH}/ must hold regular files.`);
+    } else if (entry.isDirectory()) {
+      await validatePluginFolderFiles(entryPath);
+    } else if (entryPath === PLUGIN_ICON) {
+      await validatePluginIcon(entryPath);
+    } else if (
+      IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) &&
+      !CODEX_LISTING_IMAGE_PATHS.has(entryPath)
+    ) {
+      addError(
+        `${relative} is an image; the only images in ${PLUGIN_PATH}/ are .claude-plugin/icon.svg and assets/{icon,logo,logo-dark}.png.`
+      );
+    }
+  }
+}
+
+// Pi installs a git repository from its root and reads skills only from a root
+// skills/ or package.json pi.skills, so without this entry it installs 0 skills.
+async function validatePiPackage() {
+  const manifest = await readJsonFile(path.join(repoRoot, "package.json"), "Root package.json");
+  if (!manifest) {
+    return;
+  }
+  const skills = manifest.pi?.skills;
+  if (!Array.isArray(skills) || skills.length !== 1 || skills[0] !== `${PLUGIN_SOURCE}/skills`) {
+    addError(`Root package.json must set pi.skills to ["${PLUGIN_SOURCE}/skills"].`);
+  }
 }
 
 function summarizeAndExit() {
@@ -844,8 +1036,12 @@ function summarizeAndExit() {
 
 async function main() {
   try {
-    const rootManifest = await validateRootPlugin();
-    const version = rootManifest?.version ?? null;
+    await validateRootHasNoPlugin();
+    await validateGrokRootManifest();
+    await validatePluginFolderFiles();
+    await validatePiPackage();
+    const agentPluginsManifest = await validateAgentPluginsManifest();
+    const version = agentPluginsManifest?.version ?? null;
     await validateCursor(version);
     await validateClaude(version);
     const codexCategory = await validateCodex(version);

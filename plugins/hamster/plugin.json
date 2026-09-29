@@ -1,7 +1,6 @@
 {
   "name": "hamster",
-  "displayName": "Hamster",
-  "version": "3.4.3",
+  "version": "3.4.4",
   "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
   "author": {
     "name": "Hamster",
@@ -16,13 +15,5 @@
     "task-orchestration",
     "ai-workflow",
     "workflow-automation"
-  ],
-  "category": "workflow",
-  "tags": [
-    "planning",
-    "parallel-execution",
-    "code-review",
-    "git"
-  ],
-  "logo": "assets/logo.svg"
+  ]
 }
