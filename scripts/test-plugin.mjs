@@ -16,7 +16,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const VALIDATOR = "scripts/validate-plugin.mjs";
 const BUNDLE_BUILDER = "scripts/build-codex-skills-bundle.mjs";
 const READY_SCRIPT = "plugins/hamster/skills/setup/scripts/ensure-ready.sh";
-const INSTALLER_SCRIPT = "plugins/hamster/skills/setup/scripts/install-hamster-cli.sh";
+const CLI_INSTALL_DOCS = "https://tryhamster.com/docs/hamster-studio/cli/cli-authentication";
 
 const PACKAGE_ENTRIES = [
   "plugins",
@@ -430,6 +430,48 @@ test("a download piped into a shell anywhere in plugins/hamster fails validation
   assert.doesNotMatch(result.stderr, /bootstrap\.sh:7 /);
 });
 
+
+test("a curl or wget of a URL inside plugins/hamster fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-fetch-url-");
+  await copyPackage(cwd);
+  await writeFile(
+    plugin(cwd, "skills", "setup", "scripts", "fetch.sh"),
+    "wget -O bin https://example.com/hamster\ncurl -fsSL https://example.com/hamster.sha256 -o bin.sha256\n"
+  );
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/scripts\/fetch\.sh:1 downloads a URL with curl or wget/);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/scripts\/fetch\.sh:2 downloads a URL with curl or wget/);
+});
+
+test("an install script inside plugins/hamster fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-install-script-");
+  await copyPackage(cwd);
+  await writeFile(plugin(cwd, "skills", "setup", "scripts", "install-cli.sh"), "echo hi\n");
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/scripts\/install-cli\.sh is an install script/);
+});
+
+test("a missing CLI stops setup with the install docs and installs nothing", async () => {
+  const home = await makeTemp("hamster-ready-missing-");
+  const result = await run("bash", [READY_SCRIPT], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      HOME: home,
+      PATH: "/usr/bin:/bin",
+    },
+  });
+
+  assert.equal(result.code, 1);
+  assert.equal(result.stdout.trim(), "SETUP_NEEDED");
+  assert.match(result.stderr, new RegExp(CLI_INSTALL_DOCS.replaceAll(".", "\\.")));
+  assert.equal(await pathExists(path.join(home, ".hamster", "bin", "hamster")), false);
+});
+
 test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-schema-");
   await copyPackage(cwd);
@@ -587,319 +629,4 @@ exit 0
   assert.equal(result.code, 1);
   assert.equal(result.stdout.trim(), "SETUP_NEEDED");
   assert.match(result.stderr, /status failed: not logged in/);
-});
-
-// Runs the real installer against a fake release: a stub `curl` serves a
-// tarball and its checksum from `release/`, and a stub `rm` refuses the
-// legacy /usr/local/bin/hamster path so a test can never delete a real binary.
-async function runInstaller({ checksum = "match", config = null, rc = "", binary = "echo 'hamster version v0.0.0-test'", archive = true, extraEnv = {} } = {}) {
-  const root = await makeTemp("hamster-installer-");
-  const home = path.join(root, "home");
-  const stubs = path.join(root, "stubs");
-  const release = path.join(root, "release");
-  await mkdir(home, { recursive: true });
-  await mkdir(stubs, { recursive: true });
-  await mkdir(path.join(release, "pkg"), { recursive: true });
-
-  await writeFile(path.join(release, "pkg", "hamster"), `#!/usr/bin/env bash\n${binary}\n`);
-  await chmod(path.join(release, "pkg", "hamster"), 0o755);
-  const tar = await run("tar", ["-czf", path.join(release, "archive.tar.gz"), "-C", path.join(release, "pkg"), "hamster"]);
-  assert.equal(tar.code, 0, tar.stderr);
-  const digest = createHash("sha256").update(await readFile(path.join(release, "archive.tar.gz"))).digest("hex");
-  if (checksum === "match") {
-    await writeFile(path.join(release, "archive.sha256"), `${digest}  archive.tar.gz\n`);
-  } else if (checksum === "wrong") {
-    await writeFile(path.join(release, "archive.sha256"), `${"0".repeat(64)}  archive.tar.gz\n`);
-  } else if (checksum === "empty") {
-    await writeFile(path.join(release, "archive.sha256"), "");
-  }
-  if (!archive) {
-    await unlink(path.join(release, "archive.tar.gz"));
-  }
-
-  await writeFile(
-    path.join(stubs, "curl"),
-    `#!/usr/bin/env bash
-url=""; out=""
-while [ $# -gt 0 ]; do
-  case "$1" in -o) out="$2"; shift 2 ;; -*) shift ;; *) url="$1"; shift ;; esac
-done
-case "$url" in
-  *.sha256) src="${release}/archive.sha256" ;;
-  *) src="${release}/archive.tar.gz" ;;
-esac
-echo "$url" >>"${release}/requested"
-[ -f "$src" ] || { echo "curl: (22) 404 $url" >&2; exit 22; }
-cp "$src" "$out"
-`
-  );
-  await writeFile(
-    path.join(stubs, "rm"),
-    `#!/usr/bin/env bash
-for arg in "$@"; do [ "$arg" = /usr/local/bin/hamster ] && exit 1; done
-exec /bin/rm "$@"
-`
-  );
-  await chmod(path.join(stubs, "curl"), 0o755);
-  await chmod(path.join(stubs, "rm"), 0o755);
-
-  await writeFile(path.join(home, ".bashrc"), rc);
-  const configPath = path.join(home, ".hamster", "config.yaml");
-  if (config !== null) {
-    await mkdir(path.dirname(configPath), { recursive: true });
-    await writeFile(configPath, config.text);
-    await chmod(configPath, config.mode ?? 0o644);
-  }
-
-  const env = { ...process.env, HOME: home, SHELL: "/bin/bash", PATH: `${stubs}${path.delimiter}${process.env.PATH ?? ""}` };
-  // Clear the overrides so a runner's own VERSION or HAMSTER_* never leaks in.
-  for (const name of ["VERSION", "HAMSTER_VERSION", "HAMSTER_INSTALL_DIR", "HAMSTER_URL"]) {
-    delete env[name];
-  }
-  Object.assign(env, extraEnv);
-  const invoke = (more = {}) => run("bash", [INSTALLER_SCRIPT], { cwd: repoRoot, env: { ...env, ...more } });
-  const requested = async () => (await readFile(path.join(release, "requested"), "utf8")).trim().split("\n");
-  return { home, configPath, invoke, requested, binary: path.join(home, ".hamster", "bin", "hamster") };
-}
-
-for (const checksum of ["wrong", "empty", "missing"]) {
-  test(`the CLI installer refuses a ${checksum} checksum and installs nothing`, async () => {
-    const { invoke, binary } = await runInstaller({ checksum });
-    const result = await invoke();
-    assert.equal(result.code, 1);
-    assert.match(result.stderr, checksum === "missing" ? /Failed to download the checksum/ : /Checksum mismatch/);
-    assert.match(result.stderr, /Install it by hand instead/);
-    assert.equal(await pathExists(binary), false);
-  });
-}
-
-test("a failed download ends with the manual install steps", async () => {
-  const { invoke, binary } = await runInstaller({ archive: false });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /Failed to download .*Install it by hand instead: download hamster-.*\.tar\.gz and hamster-.*\.tar\.gz\.sha256 from https:\/\/github\.com\/gethamster\/plugin\/releases\/latest/);
-  assert.equal(await pathExists(binary), false);
-});
-
-test("a binary that dies silently is reported with its exit status or signal", async () => {
-  for (const [script, expected] of [
-    ["exit 3", /failed to run \(exit status 3\)$/m],
-    ["kill -9 $$", /failed to run \(killed by signal 9\)$/m],
-    ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
-    ["echo 'bad cpu type'; exit 1", /failed to run \(exit status 1\): bad cpu type$/m],
-  ]) {
-    const { invoke } = await runInstaller({ binary: script });
-    const result = await invoke();
-    assert.equal(result.code, 1);
-    assert.match(result.stderr, expected);
-  }
-});
-
-test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {
-  const { home, configPath, invoke, binary } = await runInstaller({
-    config: { text: "profile: work\napi_url: http://old.example\n" },
-    rc: "if true; then\n  alias hamster='task-master'\nfi\n",
-  });
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const result = await invoke();
-    assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /Checksum verified/);
-    if (attempt === 0) {
-      // SHELL is bash here, so the hint names the file bash reads.
-      assert.match(result.stdout, /Restart your shell \(or run: source .*\/\.bashrc\)/);
-    }
-  }
-
-  assert.equal(await pathExists(binary), true);
-  assert.equal(await readFile(configPath, "utf8"), 'profile: work\napi_url: "https://tryhamster.com"\n');
-  const bashrc = await readFile(path.join(home, ".bashrc"), "utf8");
-  assert.match(bashrc, /^ {2}# alias hamster='task-master'/m);
-  assert.doesNotMatch(bashrc, /^\s*alias hamster='task-master'/m);
-  assert.equal(bashrc.match(/\.hamster\/bin:\$PATH/g)?.length, 1);
-  assert.equal(bashrc.match(/^alias ham='hamster'$/gm)?.length, 1);
-});
-
-test("the CLI installer names every supported client's install command", async () => {
-  const { invoke } = await runInstaller();
-  const result = await invoke();
-  assert.equal(result.code, 0, result.stderr);
-  const start = result.stdout.indexOf("Next: add the Hamster plugin in your editor.");
-  const end = result.stdout.indexOf("To keep the plan on disk in a git repo:");
-  assert.ok(start !== -1 && end > start);
-  const next = result.stdout.slice(start, end);
-  for (const block of [
-    "Claude Code         /plugin marketplace add gethamster/plugin\n                      /plugin install hamster@hamster-plugins",
-    "Codex               codex plugin marketplace add gethamster/plugin\n                      codex plugin add hamster@hamster-plugins",
-    "Cursor              Customize > Add Marketplace > Import from GitHub > https://github.com/gethamster/plugin",
-    "Antigravity         agy plugin install https://github.com/gethamster/plugin",
-    "GitHub Copilot CLI  copilot plugin marketplace add gethamster/plugin\n                      copilot plugin install hamster@hamster-plugins",
-    "Grok Build          grok plugin install gethamster/plugin --trust",
-    "Pi                  pi install git:github.com/gethamster/plugin",
-  ]) {
-    assert.ok(next.includes(block), block);
-  }
-});
-
-test("the CLI installer says so when it cannot write config.yaml", async (t) => {
-  if (process.getuid?.() === 0) {
-    t.skip("root can write a read-only directory");
-    return;
-  }
-  const { home, invoke, binary } = await runInstaller();
-  const hamsterDir = path.join(home, ".hamster");
-  await mkdir(path.join(hamsterDir, "bin"), { recursive: true });
-  await chmod(hamsterDir, 0o555);
-  const result = await invoke();
-  await chmod(hamsterDir, 0o755);
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /\[ERROR\] Could not write .*config\.yaml \(the reason is above\), so the CLI is installed but not pointed at Hamster/);
-  assert.equal(await pathExists(binary), true);
-});
-
-test("the CLI installer honors HAMSTER_VERSION, HAMSTER_INSTALL_DIR and HAMSTER_URL", async () => {
-  const { home, configPath, invoke, requested } = await runInstaller({
-    extraEnv: { HAMSTER_VERSION: "v1.2.3", HAMSTER_URL: "https://staging.example.com" },
-  });
-  const customDir = path.join(home, "tools", "bin");
-  const result = await invoke({ HAMSTER_INSTALL_DIR: customDir });
-  assert.equal(result.code, 0, result.stderr);
-  assert.equal(await pathExists(path.join(customDir, "hamster")), true);
-  const urls = await requested();
-  assert.equal(urls.length, 2);
-  for (const url of urls) {
-    assert.match(url, /^https:\/\/github\.com\/gethamster\/plugin\/releases\/download\/v1\.2\.3\/hamster-/);
-  }
-  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://staging.example.com"\n');
-  assert.match(result.stderr, /Custom install dir: make sure .* is on your PATH/);
-  assert.doesNotMatch(await readFile(path.join(home, ".bashrc"), "utf8"), /\.hamster\/bin/);
-});
-
-test("the CLI installer reads the older VERSION variable too", async () => {
-  const { invoke, requested } = await runInstaller({ extraEnv: { VERSION: "v0.9.0" } });
-  const result = await invoke();
-  assert.equal(result.code, 0, result.stderr);
-  assert.match((await requested())[0], /\/releases\/download\/v0\.9\.0\//);
-});
-
-test("HAMSTER_VERSION wins over VERSION, and a failed pinned download names that release", async () => {
-  const { invoke, requested } = await runInstaller({
-    archive: false,
-    extraEnv: { HAMSTER_VERSION: "v1.2.3", VERSION: "v0.9.0" },
-  });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match((await requested())[0], /\/releases\/download\/v1\.2\.3\//);
-  assert.match(result.stdout, /Installing release v1\.2\.3, set by HAMSTER_VERSION/);
-  assert.match(result.stderr, /If release v1\.2\.3 doesn't exist, fix or unset HAMSTER_VERSION/);
-  assert.match(result.stderr, /from https:\/\/github\.com\/gethamster\/plugin\/releases,/);
-});
-
-test("the CLI installer rejects a HAMSTER_URL that isn't http(s) or has no host", async () => {
-  for (const value of ["ftp://example.com", "https://"]) {
-    const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: value } });
-    const result = await invoke();
-    assert.equal(result.code, 1, value);
-    assert.match(result.stderr, /HAMSTER_URL must be an http:\/\/ or https:\/\/ URL with a host/);
-    assert.equal(await pathExists(binary), false);
-  }
-});
-
-test("the CLI installer says so when HAMSTER_INSTALL_DIR can't be written", async (t) => {
-  if (process.getuid?.() === 0) {
-    t.skip("root can write a read-only directory");
-    return;
-  }
-  const { home, invoke } = await runInstaller();
-  const lockedDir = path.join(home, "locked");
-  await mkdir(lockedDir, { recursive: true });
-  await chmod(lockedDir, 0o555);
-  const result = await invoke({ HAMSTER_INSTALL_DIR: lockedDir });
-  await chmod(lockedDir, 0o755);
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /Permission denied[\s\S]*\[ERROR\] Could not write to .*locked \(the reason is above\)\..* set HAMSTER_INSTALL_DIR/);
-});
-
-test("a read-only shell rc file is a warning, and the install still finishes", async (t) => {
-  if (process.getuid?.() === 0) {
-    t.skip("root can write a read-only file");
-    return;
-  }
-  const { home, configPath, invoke, binary } = await runInstaller();
-  const bashrc = path.join(home, ".bashrc");
-  await chmod(bashrc, 0o444);
-  // .zshrc takes the PATH line, but bash, the login shell, reads .bashrc.
-  await writeFile(path.join(home, ".zshrc"), "");
-  const result = await invoke();
-  await chmod(bashrc, 0o644);
-  assert.equal(result.code, 0, result.stderr);
-  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
-  assert.doesNotMatch(result.stdout, /Restart your shell/);
-  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add alias ham='hamster' to it by hand/);
-  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
-  assert.equal(await pathExists(binary), true);
-  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
-});
-
-test("an rc file the user can't touch, like a home-manager symlink, doesn't stop the install", async (t) => {
-  if (process.getuid?.() === 0) {
-    t.skip("root can write a read-only file");
-    return;
-  }
-  const { home, configPath, invoke, binary } = await runInstaller();
-  const bashrc = path.join(home, ".bashrc");
-  // A file owned by root stands in for a symlink into a read-only store such
-  // as the nix store: a non-root user can neither write nor touch it. (Root is
-  // skipped above, so this never writes to it.)
-  await unlink(bashrc);
-  await symlink("/etc/shells", bashrc);
-  const result = await invoke();
-  assert.equal(result.code, 0, result.stderr);
-  // The file exists, so it isn't touched, and bash reads it.
-  assert.doesNotMatch(result.stderr, /Could not create/);
-  assert.doesNotMatch(result.stderr, /doesn't read ~\/\.zshrc/);
-  assert.match(result.stderr, /\[WARN\] Could not write .*\.bashrc\. Add export PATH=/);
-  assert.equal(await pathExists(binary), true);
-  assert.equal(await readFile(configPath, "utf8"), 'api_url: "https://tryhamster.com"\n');
-});
-
-test("a config.yaml the installer can't write names the reason", async () => {
-  const { configPath, invoke } = await runInstaller();
-  await mkdir(configPath, { recursive: true });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /Is a directory[\s\S]*\[ERROR\] Could not write .*config\.yaml \(the reason is above\)/);
-});
-
-test("a login shell other than bash or zsh gets a PATH warning, even with a .bashrc", async () => {
-  const { invoke, binary } = await runInstaller();
-  const result = await invoke({ SHELL: "/usr/bin/fish" });
-  assert.equal(result.code, 0, result.stderr);
-  assert.match(result.stderr, /\[WARN\] Your login shell \(\/usr\/bin\/fish\) doesn't read ~\/\.zshrc or ~\/\.bashrc/);
-  assert.doesNotMatch(result.stdout, /Restart your shell/);
-  assert.equal(await pathExists(binary), true);
-
-  const bashResult = await invoke();
-  assert.doesNotMatch(bashResult.stderr, /doesn't read ~\/\.zshrc/);
-});
-
-test("the CLI installer rejects a HAMSTER_URL that would break config.yaml", async () => {
-  const { invoke, binary } = await runInstaller({ extraEnv: { HAMSTER_URL: 'https://x.example.com/"quoted' } });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /HAMSTER_URL must not contain spaces, quotes, or backslashes/);
-  assert.equal(await pathExists(binary), false);
-});
-
-test("the CLI installer stops without touching a config.yaml it cannot read", async (t) => {
-  if (process.getuid?.() === 0) {
-    t.skip("root can read a mode 000 file");
-    return;
-  }
-  const { configPath, invoke } = await runInstaller({ config: { text: "profile: work\n", mode: 0o000 } });
-  const result = await invoke();
-  assert.equal(result.code, 1);
-  assert.match(result.stderr, /Could not read .*config\.yaml, so it was left unchanged/);
-  await chmod(configPath, 0o644);
-  assert.equal(await readFile(configPath, "utf8"), "profile: work\n");
 });
