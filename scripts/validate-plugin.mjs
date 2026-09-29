@@ -749,6 +749,7 @@ const DUPLICATE_GROUPS = [
   ["plugins/hamster/skills/ship/references/execution-loop.md", "plugins/hamster/skills/resume-hamster/references/execution-loop.md"],
   ["plugins/hamster/skills/ship/references/agents/task-executor.md", "plugins/hamster/skills/resume-hamster/references/agents/task-executor.md"],
   ["plugins/hamster/skills/ship/references/agents/wave-reviewer.md", "plugins/hamster/skills/resume-hamster/references/agents/wave-reviewer.md"],
+  ["LICENSE", "plugins/hamster/LICENSE"],
 ];
 
 const skillDirReferencePattern = /\$SKILL_DIR\/([A-Za-z0-9._/-]+)/g;

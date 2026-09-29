@@ -516,6 +516,7 @@ test("the Codex bundle carries only skills, assets, and a stripped manifest", as
     assert.equal(entries.filter((entry) => entry === image).length, 1, image);
   }
   assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
+  assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
