@@ -383,7 +383,7 @@ test("a symlink or an image inside plugins/hamster fails validation", async () =
   assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/logo\.png is an image/);
 });
 
-test("only a self-contained .claude-plugin/icon.svg may be an image inside plugins/hamster", async () => {
+test("images inside plugins/hamster fail except the Claude icon and the three Codex listing PNGs", async () => {
   const cwd = await makeTemp("hamster-plugin-icon-");
   await copyPackage(cwd);
   const iconPath = plugin(cwd, ".claude-plugin", "icon.svg");
@@ -400,6 +400,9 @@ test("only a self-contained .claude-plugin/icon.svg may be an image inside plugi
   assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not contain <image>/);
   assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not reference external resources/);
   assert.doesNotMatch(result.stderr, /\.claude-plugin\/icon\.svg is an image/);
+  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/icon\.png is an image/);
+  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/logo\.png is an image/);
+  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/logo-dark\.png is an image/);
 });
 
 test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
@@ -418,16 +421,35 @@ test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation",
   assert.match(result.stderr, /plugins\/hamster\/plugin\.json must not declare "\$schema"/);
 });
 
-test("a Codex manifest that points at a bundled image fails validation", async () => {
+test("the three Codex listing images inside plugins/hamster pass validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-icons-");
+  await copyPackage(cwd);
+
+  const result = await runValidator(cwd);
+  assert.equal(result.code, 0, result.stderr);
+  const manifest = JSON.parse(await readFile(plugin(cwd, ".codex-plugin", "plugin.json"), "utf8"));
+  assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
+  assert.equal(manifest.interface.logo, "./assets/logo.png");
+  assert.equal(manifest.interface.logoDark, "./assets/logo-dark.png");
+});
+
+test("a Codex image other than the three listing PNGs fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-image-");
   await copyPackage(cwd);
   await patchCodexInterface(cwd, (iface) => {
-    iface.logo = "./assets/logo.png";
+    iface.logo = "./assets/logo.svg";
+    iface.screenshots = ["./assets/shot.png"];
   });
+  await cp(path.join(cwd, "assets", "logo.svg"), plugin(cwd, "assets", "logo.svg"));
+  const icon = plugin(cwd, "assets", "icon.png");
+  await writeFile(icon, Buffer.concat([await readFile(icon), Buffer.from([0])]));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /interface\.logo must not be set/);
+  assert.match(result.stderr, /interface\.logo must be "\.\/assets\/logo\.png"/);
+  assert.match(result.stderr, /interface\.screenshots must not be set/);
+  assert.match(result.stderr, /plugins\/hamster\/assets\/logo\.svg is an image/);
+  assert.match(result.stderr, /plugins\/hamster\/assets\/icon\.png must match root assets\/icon\.png byte for byte/);
 });
 
 test("a Pi manifest that stops pointing at plugins/hamster fails validation", async () => {
@@ -486,10 +508,14 @@ test("the Codex bundle carries only skills, assets, and a stripped manifest", as
   assert.equal(Object.hasOwn(manifest, "apps"), false);
   assert.equal(Object.hasOwn(manifest.interface, "screenshots"), false);
   assert.equal(manifest.interface.displayName, "Hamster");
-  // plugins/hamster carries no Codex listing images, so they come from the root assets/.
+  // Root assets/ is copied once. plugins/hamster/assets/ is not archived beside it.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
   assert.equal(manifest.interface.logo, "./assets/logo.png");
   assert.equal(manifest.interface.logoDark, "./assets/logo-dark.png");
+  for (const image of ["assets/icon.png", "assets/logo.png", "assets/logo-dark.png", "assets/logo.svg", "assets/logo-dark.svg"]) {
+    assert.equal(entries.filter((entry) => entry === image).length, 1, image);
+  }
+  assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
