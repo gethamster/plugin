@@ -365,11 +365,13 @@ async function validateCursor(version) {
     addError('Cursor plugin.json "license" must be "MIT".');
   }
 
-  // Cursor loads MCP from the plugin's dialect files, so an inline pointer here is
-  // a second source of truth for the same endpoint. Claude and Codex are
-  // asserted to carry the pointer; Cursor is asserted not to.
-  if (manifest.mcpServers !== undefined) {
-    addError("Cursor plugin.json must not include mcpServers.");
+  // Cursor loads mcp.json unless this manifest sets mcpServers. plugins/hamster/
+  // has no mcp.json, so the pointer has to be ./.mcp.json and that file has to
+  // exist. Claude and Codex carry the same pointer.
+  if (manifest.mcpServers !== "./.mcp.json") {
+    addError('Cursor plugin.json must set mcpServers to "./.mcp.json".');
+  } else if (!(await pathExists(path.join(pluginDir, ".mcp.json")))) {
+    addError("Cursor plugin.json mcpServers points at a missing .mcp.json.");
   }
 
   requireVersionParity("Cursor plugin.json", manifest.version, version);
@@ -633,8 +635,9 @@ async function validateCodex(version) {
 async function validateMcpFiles() {
   const urls = new Map();
 
-  // Antigravity reads mcp_config.json; Claude Code, Codex, Copilot CLI, Cursor,
-  // and Grok Build read .mcp.json.
+  // Antigravity reads mcp_config.json. Claude Code, Codex, Copilot CLI, and
+  // Grok Build read .mcp.json. Cursor does not: it loads mcp.json unless
+  // .cursor-plugin/plugin.json sets mcpServers to "./.mcp.json".
   const config = await readJsonFile(path.join(pluginDir, "mcp_config.json"), `${PLUGIN_PATH}/mcp_config.json`);
   if (config) {
     const serverUrl = config.mcpServers?.hamster?.serverUrl;

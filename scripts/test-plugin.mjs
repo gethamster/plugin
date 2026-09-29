@@ -196,6 +196,19 @@ test("a missing referenced path fails validation", async () => {
   assert.match(result.stderr, /field "logo" references missing path "assets\/does-not-exist\.svg"/);
 });
 
+test("a Cursor manifest without mcpServers fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-cursor-mcp-");
+  await copyPackage(cwd);
+  const manifestPath = plugin(cwd, ".cursor-plugin", "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete manifest.mcpServers;
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /Cursor plugin\.json must set mcpServers to "\.\/\.mcp\.json"/);
+});
+
 test("an over-cap Codex shortDescription fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-short-");
   await copyPackage(cwd);
