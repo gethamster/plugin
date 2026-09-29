@@ -688,11 +688,34 @@ test("a binary that dies silently is reported with its exit status or signal", a
     ["echo 'libfoo missing' >&2; exit 127", /failed to run \(exit status 127\): libfoo missing$/m],
     ["echo 'bad cpu type'; exit 1", /failed to run \(exit status 1\): bad cpu type$/m],
   ]) {
-    const { invoke } = await runInstaller({ binary: script });
+    const { invoke, binary } = await runInstaller({ binary: script });
     const result = await invoke();
     assert.equal(result.code, 1);
     assert.match(result.stderr, expected);
+    assert.equal(await pathExists(binary), false);
+    assert.deepEqual(await readdir(path.dirname(binary)), []);
   }
+});
+
+test("a binary that fails to run leaves the installed CLI and shell config alone", async () => {
+  const { home, configPath, invoke, binary } = await runInstaller({
+    binary: "echo 'libfoo missing' >&2; exit 127",
+    config: { text: "profile: work\napi_url: http://old.example\n" },
+    rc: "already configured\n",
+  });
+  const previous = "#!/usr/bin/env bash\necho hamster version v-previous\n";
+  await mkdir(path.dirname(binary), { recursive: true });
+  await writeFile(binary, previous);
+  await chmod(binary, 0o755);
+  const bashrcBefore = await readFile(path.join(home, ".bashrc"), "utf8");
+
+  const result = await invoke();
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /Did not install over .*\/hamster; it failed to run \(exit status 127\): libfoo missing/);
+  assert.equal(await readFile(binary, "utf8"), previous);
+  assert.deepEqual(await readdir(path.dirname(binary)), ["hamster"]);
+  assert.equal(await readFile(path.join(home, ".bashrc"), "utf8"), bashrcBefore);
+  assert.equal(await readFile(configPath, "utf8"), "profile: work\napi_url: http://old.example\n");
 });
 
 test("the CLI installer verifies, installs, and edits shell and CLI config once", async () => {

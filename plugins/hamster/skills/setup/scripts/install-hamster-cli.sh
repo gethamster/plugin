@@ -8,10 +8,11 @@
 # stable so that URL can point at it.
 #
 # It downloads a release archive from github.com/gethamster/plugin, refuses to
-# install unless the archive matches the SHA-256 published next to it, installs
-# the binary with an atomic rename, puts ~/.hamster/bin on PATH in ~/.zshrc and
-# ~/.bashrc, retires stale task-master aliases, adds the `ham` alias, and points
-# the CLI at Hamster in ~/.hamster/config.yaml.
+# install unless the archive matches the SHA-256 published next to it, and runs
+# the downloaded binary before an atomic rename replaces anything already
+# installed. It puts ~/.hamster/bin on PATH in ~/.zshrc and ~/.bashrc, retires
+# stale task-master aliases, adds the `ham` alias, and points the CLI at Hamster
+# in ~/.hamster/config.yaml.
 #
 # Environment overrides:
 #   HAMSTER_VERSION      Release tag to install, e.g. v1.68.0. Default: the
@@ -86,7 +87,18 @@ fi
 manual="Install it by hand instead: download ${archive} and ${archive}.sha256 from ${release_page}, check that they match, and put the hamster binary from the archive in ${INSTALL_DIR}."
 
 work="$(mktemp -d)"
-trap 'rm -rf "$work"' EXIT
+# Removed on exit, including after a failed --version, so a bad download never
+# stays beside the binary the user already had.
+stage_dir=""
+cleanup() {
+  # Keep the installer's own exit status. A cleanup failure must not turn a
+  # refused download into success, or a finished install into a failure.
+  status=$?
+  rm -rf "$work" || true
+  [ -z "$stage_dir" ] || rm -rf "$stage_dir" || true
+  exit "$status"
+}
+trap cleanup EXIT
 
 info "Downloading $url"
 curl -fsSL "$url" -o "$work/$archive" || fail "Failed to download $url.${missing_release} $manual"
@@ -108,11 +120,32 @@ tar -xzf "$work/$archive" -C "$work" || fail "Failed to extract $archive. $manua
 
 # Stage next to the destination and rename, so the swap is atomic and lands on
 # a fresh inode: macOS kills an executable whose inode was rewritten in place.
+# --version runs from the stage directory, under the name hamster, before that
+# rename. A binary that will not start must not replace one that already does,
+# and must not edit shell or CLI config.
 mkdir -p "$INSTALL_DIR" || fail "Could not create $INSTALL_DIR (the reason is above). Fix that path, or set HAMSTER_INSTALL_DIR to a directory you own."
 cannot_install="Could not write to $INSTALL_DIR (the reason is above). Free space there or make it writable, or set HAMSTER_INSTALL_DIR to a directory you own."
-mv -f "$work/$BINARY" "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
-chmod +x "$INSTALL_DIR/.$BINARY.new" || fail "$cannot_install"
-mv -f "$INSTALL_DIR/.$BINARY.new" "$INSTALL_DIR/$BINARY" || fail "$cannot_install"
+stage_dir="$(mktemp -d "$INSTALL_DIR/.install-stage.XXXXXX")" || fail "$cannot_install"
+mv -f "$work/$BINARY" "$stage_dir/$BINARY" || fail "$cannot_install"
+chmod +x "$stage_dir/$BINARY" || fail "$cannot_install"
+
+version_err="$work/version.err"
+code=0
+version="$("$stage_dir/$BINARY" --version 2>"$version_err")" || code=$?
+if [ "$code" -ne 0 ]; then
+  # A macOS code-signing kill or a loader abort prints nothing, so name the
+  # exit status or signal as well as whatever the binary printed.
+  reason="$(cat "$version_err")"
+  reason="${reason:-$version}"
+  if [ "$code" -gt 128 ]; then
+    how="killed by signal $((code - 128))"
+  else
+    how="exit status $code"
+  fi
+  fail "Did not install over $INSTALL_DIR/$BINARY; it failed to run ($how)${reason:+: $reason}"
+fi
+
+mv -f "$stage_dir/$BINARY" "$INSTALL_DIR/$BINARY" || fail "$cannot_install"
 info "Installed $INSTALL_DIR/$BINARY"
 
 # A root-installed binary from the old sudo installer would shadow this one for
@@ -184,22 +217,6 @@ if [ -z "$rc_file" ] && [ "$INSTALL_DIR" = "$DEFAULT_INSTALL_DIR" ]; then
 fi
 if [ "$INSTALL_DIR" != "$DEFAULT_INSTALL_DIR" ]; then
   warn "Custom install dir: make sure $INSTALL_DIR is on your PATH."
-fi
-
-version_err="$work/version.err"
-code=0
-version="$("$INSTALL_DIR/$BINARY" --version 2>"$version_err")" || code=$?
-if [ "$code" -ne 0 ]; then
-  # A macOS code-signing kill or a loader abort prints nothing, so name the
-  # exit status or signal as well as whatever the binary printed.
-  reason="$(cat "$version_err")"
-  reason="${reason:-$version}"
-  if [ "$code" -gt 128 ]; then
-    how="killed by signal $((code - 128))"
-  else
-    how="exit status $code"
-  fi
-  fail "Installed $INSTALL_DIR/$BINARY but it failed to run ($how)${reason:+: $reason}"
 fi
 
 config_dir="$HOME/.hamster"
