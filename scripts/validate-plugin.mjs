@@ -392,11 +392,30 @@ async function validateClaude(version) {
     if (manifest.license !== "MIT") {
       addError('Claude plugin.json "license" must be "MIT".');
     }
-    // The Claude plugin directory flags a listing without one.
-    if (typeof manifest.privacyPolicyUrl !== "string" || !manifest.privacyPolicyUrl.startsWith("https://")) {
-      addError('Claude plugin.json must set an https "privacyPolicyUrl".');
+    // privacyPolicyUrl is not in Claude Code's manifest schema. The directory
+    // warns UNKNOWN_KEY on it and says Claude Code ignores the key at load
+    // time. The same check accepts a Privacy link in the plugin README, which
+    // is what plugins/hamster/README.md carries. Putting the key back brings
+    // the warning back.
+    if (Object.prototype.hasOwnProperty.call(manifest, "privacyPolicyUrl")) {
+      addError(
+        'Claude plugin.json must not set "privacyPolicyUrl". Link the policy from plugins/hamster/README.md instead.',
+      );
     }
     requireVersionParity("Claude plugin.json", manifest.version, version);
+  }
+
+  const readmePath = path.join(pluginDir, "README.md");
+  let readme = "";
+  try {
+    readme = await fs.readFile(readmePath, "utf8");
+  } catch {
+    addError("plugins/hamster/README.md is missing, so the privacy policy link is missing.");
+  }
+  if (readme && !/\[[^\]]*Privacy[^\]]*\]\(https:\/\/[^)\s]+\)/i.test(readme)) {
+    addError(
+      'plugins/hamster/README.md must include a Markdown link whose text contains "Privacy" and whose URL is https.',
+    );
   }
 
   const marketplacePath = path.join(repoRoot, ".claude-plugin", "marketplace.json");

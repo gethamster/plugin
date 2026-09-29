@@ -257,6 +257,34 @@ test("a non-https Codex privacyPolicyURL fails validation", async () => {
   assert.match(result.stderr, /interface\.privacyPolicyURL must be https/);
 });
 
+test("privacyPolicyUrl on the Claude manifest fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-claude-privacy-key-");
+  await copyPackage(cwd);
+  const manifestPath = plugin(cwd, ".claude-plugin", "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.privacyPolicyUrl = "https://tryhamster.com/privacy-policy";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /must not set "privacyPolicyUrl"/);
+});
+
+test("a plugin README without a Privacy link fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-readme-privacy-");
+  await copyPackage(cwd);
+  const readmePath = plugin(cwd, "README.md");
+  const readme = (await readFile(readmePath, "utf8")).replaceAll(
+    "[Privacy Policy](https://tryhamster.com/privacy-policy)",
+    "Privacy Policy",
+  );
+  await writeFile(readmePath, readme);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /README\.md must include a Markdown link whose text contains "Privacy"/);
+});
+
 test("a dropped Codex support link fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-support-");
   await copyPackage(cwd);
