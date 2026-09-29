@@ -92,12 +92,12 @@ To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`
 pi install git:github.com/gethamster/plugin
 ```
 
-Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to sign in. If `hamster` is missing, install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication first.
+Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to install it and sign in.
 
 ## After install
 
 1. **Talk** — hosted MCP at `https://tryhamster.com/mcp`, or `hamster chat` when MCP tools are unavailable and the CLI is signed in. Your client owns the Hamster sign-in.
-2. **Plan on disk** — say Install Hamster, or run ship. If the CLI is missing, install it from https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. The setup skill signs you in with `hamster auth login` only when you aren't already signed in (asking before it opens a browser), and syncs the plan.
+2. **Plan on disk** — say Install Hamster, or run ship. The setup skill installs the CLI if needed, signs you in with `hamster auth login` only when you aren't already signed in (asking before it opens a browser), and syncs the plan.
 3. **Ship** — execute the brief already on disk. Nothing runs automatically on session start.
 
 ## Skills
@@ -106,7 +106,7 @@ Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Bu
 
 | Skill | Persona | Description |
 |-------|---------|-------------|
-| `/hamster:setup` | — | Sign in and sync the plan into this repo. If the CLI is missing, point at the install docs and stop |
+| `/hamster:setup` | — | Install the CLI, sign in, and sync the plan into this repo |
 | `/hamster:ask-hamster [request]` | Workspace Copilot | Connect current code with workspace priorities, blockers, blueprints, or related work (hosted MCP when the client has it; `hamster chat` otherwise) |
 | `/hamster:ship [slug-or-url]` | Release Engineer | Ship a brief: merge base, implement in parallel, test, review, bisectable commits, PR |
 | `/hamster:plan-hamster [slug-or-url]` | Tech Lead + CEO/Eng modes | Analyze brief with optional founder or architecture review |
@@ -119,7 +119,7 @@ Four skills carry a `-hamster` suffix because Cursor invokes plugin skills as a 
 
 #### `/hamster:setup`
 
-The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is installed and you are signed in, it runs `hamster sync` to refresh the plan. If `hamster` is missing, it stops and points at https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. It does not download the CLI. Once the CLI is installed, it checks `hamster --no-tui status` and asks before opening a browser to sign in if you aren't signed in, and inits and syncs, only when you asked.
+The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is installed and you are signed in, it runs `hamster sync` to refresh the plan. Otherwise it installs the CLI, checks `hamster --no-tui status` and asks before opening a browser to sign in if you aren't signed in, and inits/syncs — only when you asked.
 
 #### `/hamster:ask-hamster`
 
@@ -221,7 +221,7 @@ Every skill directory is self-contained: no SKILL.md reads a sibling skill's fil
 
 The one plugin manifest at the root is `.grok-plugin/plugin.json`. Grok Build's `plugin install <repo>` reads a manifest at the repository root and doesn't follow a marketplace catalog, so this file points its `skills`, `agents`, and `mcpServers` into `plugins/hamster/`. It keeps `grok plugin install gethamster/plugin --trust` working and lets existing Grok installs update onto this layout. `agents` must stay a directory path: Grok loads no agents from an array of files. `sync-adapters.mjs` writes its name, version, and description from `plugins/hamster/plugin.json`, and `validate-plugin.mjs` checks that each path resolves and that no other `<client>-plugin/plugin.json` appears at the root. Antigravity and Pi don't read `.grok-plugin/`, and the Claude plugin directory scans only `plugins/hamster/`.
 
-`setup` does not download the CLI. When `hamster` is missing it stops and points at https://tryhamster.com/docs/hamster-studio/cli/cli-authentication. The one-liner below is for installing the CLI without a plugin, and it stays at the repository root, outside the folder the directory scans. `validate-plugin.mjs` fails if `plugins/hamster/` contains an install script, a curl or wget of a URL, or a download handed to a shell.
+`setup` installs the CLI by running the bundled `plugins/hamster/skills/setup/scripts/install-hamster-cli.sh`, never by piping a download into a shell: the Claude plugin directory flags a download-and-run command in any file the plugin ships, skill and README text included, and asks for the script to ship inside the plugin instead. `validate-plugin.mjs` fails on a `curl … | bash`, `bash <(curl …)`, `bash -c "$(curl …)"`, or `iwr … | iex` line anywhere in `plugins/hamster/`.
 
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 
