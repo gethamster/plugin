@@ -3,9 +3,6 @@
 #
 # This is the Hamster CLI installer. The plugin's setup skill runs it directly
 # from its own scripts/ folder, so what installs the CLI is part of the plugin.
-# It is written to be served as https://tryhamster.com/cli/install too; keep
-# its path, plugins/hamster/skills/setup/scripts/install-hamster-cli.sh,
-# stable so that URL can point at it.
 #
 # It downloads a release archive from github.com/gethamster/plugin, refuses to
 # install unless the archive matches the SHA-256 published next to it, and runs
