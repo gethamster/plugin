@@ -221,8 +221,6 @@ Every skill directory is self-contained: no SKILL.md reads a sibling skill's fil
 
 The one plugin manifest at the root is `.grok-plugin/plugin.json`. Grok Build's `plugin install <repo>` reads a manifest at the repository root and doesn't follow a marketplace catalog, so this file points its `skills`, `agents`, and `mcpServers` into `plugins/hamster/`. It keeps `grok plugin install gethamster/plugin --trust` working and lets existing Grok installs update onto this layout. `agents` must stay a directory path: Grok loads no agents from an array of files. `sync-adapters.mjs` writes its name, version, and description from `plugins/hamster/plugin.json`, and `validate-plugin.mjs` checks that each path resolves and that no other `<client>-plugin/plugin.json` appears at the root. Antigravity and Pi don't read `.grok-plugin/`, and the Claude plugin directory scans only `plugins/hamster/`.
 
-`setup` installs the CLI by running the bundled `plugins/hamster/skills/setup/scripts/install-hamster-cli.sh`, never by piping a download into a shell: the Claude plugin directory flags a download-and-run command in any file the plugin ships, skill and README text included, and asks for the script to ship inside the plugin instead. `validate-plugin.mjs` fails on a `curl … | bash`, `bash <(curl …)`, `bash -c "$(curl …)"`, or `iwr … | iex` line anywhere in `plugins/hamster/`.
-
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 
 | Source of truth | Copies |
