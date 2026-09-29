@@ -6,10 +6,10 @@
  * A skills-only submission excludes MCP, app, and screenshot configuration, so
  * the bundle carries the Codex manifest from plugins/hamster stripped of those
  * keys, with the listing images from the root assets/ added, alongside the
- * skills tree and the license. plugins/hamster itself keeps its full CLI + MCP +
- * skills shape for every GitHub and marketplace install, and no images beyond
- * the Claude directory's text-only .claude-plugin/icon.svg, because the Claude
- * plugin directory holds a plugin whose files refer to bundled images.
+ * skills tree and the license. plugins/hamster also carries those same three
+ * PNGs for a marketplace install. This zip copies the root assets/ once and
+ * does not also copy plugins/hamster/assets, so the archive does not contain
+ * the same image twice.
  *
  * Usage:
  *   node scripts/build-codex-skills-bundle.mjs                 # dist/
@@ -166,10 +166,22 @@ async function stageBundle(stagingDir, skillNames) {
     });
   }
 
+  // One assets/ tree, from the repository root. plugins/hamster/assets/ is the
+  // marketplace copy of the three PNGs; copying it too would archive them twice.
   await fs.cp(path.join(repoRoot, "assets"), path.join(stagingDir, "assets"), {
     recursive: true,
     dereference: true,
   });
+  const pluginAssets = path.join(pluginDir, "assets");
+  if (await pathExists(pluginAssets)) {
+    for (const name of await fs.readdir(pluginAssets)) {
+      if (!(await pathExists(path.join(stagingDir, "assets", name)))) {
+        throw new Error(
+          `${name} is in plugins/hamster/assets but missing from the staged root assets/. The bundle copies root assets/ once.`
+        );
+      }
+    }
+  }
   await fs.cp(path.join(repoRoot, "LICENSE"), path.join(stagingDir, "LICENSE"));
 }
 

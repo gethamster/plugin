@@ -496,7 +496,16 @@ const codexListing = {
   defaultPrompt: { max: 3, chars: 128 },
 };
 
-const CODEX_IMAGE_FIELDS = ["logo", "logoDark", "composerIcon", "screenshots"];
+// Marketplace installs resolve these inside the plugin folder. The skills-only
+// zip still copies the same three files once from the root assets/.
+const CODEX_LISTING_IMAGES = {
+  composerIcon: "./assets/icon.png",
+  logo: "./assets/logo.png",
+  logoDark: "./assets/logo-dark.png",
+};
+const CODEX_LISTING_IMAGE_PATHS = new Set(
+  Object.values(CODEX_LISTING_IMAGES).map((relative) => path.join(pluginDir, relative.slice(2)))
+);
 
 function codexError(field, message) {
   addError(`Codex plugin.json interface.${field} ${message}`);
@@ -583,13 +592,34 @@ async function validateCodexInterface(iface) {
     }
   }
 
-  // Codex resolves image paths inside the plugin folder, and the Claude plugin
-  // directory holds a plugin whose files refer to bundled images for review.
-  // build-codex-skills-bundle.mjs adds the listing images from the root assets/.
-  for (const field of CODEX_IMAGE_FIELDS) {
-    if (iface[field] !== undefined) {
-      codexError(field, "must not be set; build-codex-skills-bundle.mjs adds the listing images to its bundle.");
+  // Exactly the three listing images, at the paths Codex resolves inside the
+  // installed plugin folder. screenshots stay unset: a skills-only upload rejects
+  // them, and any other image path is still a bundled image held for review.
+  for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
+    if (iface[field] !== expected) {
+      codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
+      continue;
     }
+    const pluginFile = path.join(pluginDir, expected.slice(2));
+    const rootFile = path.join(repoRoot, expected.slice(2));
+    let pluginBytes;
+    let rootBytes;
+    try {
+      pluginBytes = await fs.readFile(pluginFile);
+      rootBytes = await fs.readFile(rootFile);
+    } catch (error) {
+      if (isNotFound(error)) {
+        codexError(field, `file ${path.relative(repoRoot, pluginFile)} must exist and match the root assets/ copy.`);
+        continue;
+      }
+      throw error;
+    }
+    if (!pluginBytes.equals(rootBytes)) {
+      codexError(field, `file ${path.relative(repoRoot, pluginFile)} must match root ${expected.slice(2)} byte for byte.`);
+    }
+  }
+  if (iface.screenshots !== undefined) {
+    codexError("screenshots", "must not be set; a skills-only bundle excludes screenshots.");
   }
 }
 
@@ -918,10 +948,11 @@ async function validateGrokRootManifest() {
 }
 
 // The Claude plugin directory refuses symbolic links in what a plugin loads and
-// holds a plugin whose files refer to bundled images. Listing images stay in the
-// root assets/. The one exception is .claude-plugin/icon.svg, which the
-// directory reads for its listing icon: SVG is text the scan can read, so it is
-// allowed as long as it pulls in no raster, script, or external resource.
+// holds a plugin whose files refer to bundled images. The Codex marketplace
+// card is the exception under test: composerIcon, logo, and logoDark are the
+// three PNGs in plugins/hamster/assets/, byte-identical to the root assets/.
+// .claude-plugin/icon.svg stays allowed too: SVG is text the scan can read, so
+// it is allowed as long as it pulls in no raster, script, or external resource.
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico"]);
 const PLUGIN_ICON = path.join(pluginDir, ".claude-plugin", "icon.svg");
 
@@ -963,8 +994,13 @@ async function validatePluginFolderFiles(dir = pluginDir) {
       await validatePluginFolderFiles(entryPath);
     } else if (entryPath === PLUGIN_ICON) {
       await validatePluginIcon(entryPath);
-    } else if (IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-      addError(`${relative} is an image; keep listing images in the root assets/.`);
+    } else if (
+      IMAGE_EXTENSIONS.has(path.extname(entry.name).toLowerCase()) &&
+      !CODEX_LISTING_IMAGE_PATHS.has(entryPath)
+    ) {
+      addError(
+        `${relative} is an image; the only images in ${PLUGIN_PATH}/ are .claude-plugin/icon.svg and assets/{icon,logo,logo-dark}.png.`
+      );
     }
   }
 }
