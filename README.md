@@ -63,8 +63,6 @@ agy plugin uninstall hamster
 agy plugin install https://github.com/gethamster/plugin
 ```
 
-To update a 3.4.3 install to 3.4.4, run `agy plugin install https://github.com/gethamster/plugin` again.
-
 In the Antigravity app (2.15 or newer), authenticate `hamster_hamster` under Settings → Customizations → Installed MCP Servers. The plugin registers that server itself, so a manual `hamster` entry in `mcp_config.json` would add a second copy of every tool.
 
 Using GitHub Copilot CLI, Grok Build, or Pi? See [More install options](#more-install-options).
