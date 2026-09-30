@@ -34,7 +34,7 @@ const LISTING_IMAGES = {
   logoDark: "./assets/logo-dark.png",
 };
 
-// https://developers.openai.com/plugins/deploy/submit: ZIPs with app references
+// https://developers.openai.com/plugins/deploy/submission: ZIPs with app references
 // or lifecycle hooks can't be submitted.
 const EXCLUDED_MANIFEST_KEYS = ["apps", "hooks"];
 

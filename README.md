@@ -42,6 +42,8 @@ You can also launch `codex`, run `/plugins`, and install `hamster@hamster-plugin
 
 The Hamster listing in OpenAI's Plugins Directory, used by Codex and ChatGPT, is a zip of this same plugin produced by `node scripts/build-codex-bundle.mjs`: the Codex manifest, the hosted MCP connector in `.mcp.json`, the skills, and the listing images. CI builds it on every push and uploads it as a workflow artifact, and the artifact download is the zip to upload to the directory.
 
+Hamster connects to your workspace through the hosted MCP server. Coding skills require access to your repository and a shell.
+
 ### Antigravity
 
 From this repository:
@@ -214,6 +216,8 @@ Produces: metrics table, hourly distribution, session analysis, hotspots, PR siz
 | **wave-reviewer** | Staff Engineer | Reviews a whole wave's diff (per-parent verdicts + cross-parent integration checks), then simplifies |
 
 Canonical worker protocols live in `plugins/hamster/skills/ship/references/agents/`. `plugins/hamster/agents/task-executor.md` and `plugins/hamster/agents/wave-reviewer.md` are generated native adapters (registration + model metadata) over those bodies, and every client with native agents registers them from that one folder — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code, Copilot CLI, and Grok Build do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
+
+Executors implement unambiguous brief/spec authority over contradictory tasks and record resolved plan issues; only unresolved or unbuilt work blocks completion, and resumed PR updates retain earlier task and plan-feedback resolutions.
 
 Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`, `build-codex-bundle.mjs`); it is not part of the installed plugin.
 

@@ -1,6 +1,6 @@
 {
   "name": "hamster",
-  "version": "3.4.5",
+  "version": "3.4.6",
   "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
   "author": {
     "name": "Hamster",
@@ -20,13 +20,13 @@
   ],
   "interface": {
     "displayName": "Hamster",
-    "shortDescription": "The spec layer for AI agents",
-    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. Ask Hamster reads briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context over the Hamster CLI, and over the hosted Hamster MCP server at https://tryhamster.com/mcp in clients that have those tools. In ChatGPT, Hamster works through the hosted MCP server; the setup, ship, plan, resume, review, QA, and retro skills need Codex, because they run the Hamster CLI and git in your repository.",
+    "shortDescription": "Ask Hamster and ship briefs",
+    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster’s hosted MCP server. In Codex, build, test, and review code from existing Briefs and Plans, with your approval before pushing or opening a pull request. Coding skills need access to your repository and a shell.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
     "websiteURL": "https://tryhamster.com",
-    "supportURL": "https://tryhamster.com/support",
+    "supportURL": "https://tryhamster.com/docs",
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
     "defaultPrompt": [
