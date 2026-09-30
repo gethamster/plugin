@@ -100,4 +100,4 @@ Verify the branch first: if not on `feature/{key}-{n}-{slug}`, ask whether to sw
 
 Dirty working tree not attributable to an in_progress task → show the changes, ask: commit as part of current task / stash / discard.
 
-Then read [execution-loop](references/execution-loop.md) and run its **Execution Loop** and **Completion** sections exactly as written, starting at the resume wave (partial waves: launch executors only for uncommitted parents). One difference at completion: if a PR already exists for this branch, just push — the PR updates automatically; report its URL instead of creating a new one.
+Then read [execution-loop](references/execution-loop.md) and run its **Execution Loop** and **Completion** sections exactly as written, starting at the resume wave (partial waves: launch executors only for uncommitted parents). At completion, an existing PR needs both a push and a body update: merge resumed task statuses and Plan Feedback with its prior entries and resolutions, preserving other existing content, and report its URL. If no PR exists, keep the loop's user consent before creating one.

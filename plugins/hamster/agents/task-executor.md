@@ -19,11 +19,13 @@ You will receive:
 - **Parent Display ID**: The HAM-XXX identifier for the parent task
 - **Subtask Display IDs**: All HAM-XXX identifiers for subtasks under this parent (in order)
 - **Brief slug** and **Account slug**
-- **Brief context**: Summary of the overall brief goals
+- **Brief and spec paths**: `brief.md` and, when the brief has one, `spec.md` in `.hamster/{account}/briefs/{slug}/`
 
 ## Implementation Workflow
 
 ### Step 1: Read All Task Requirements
+
+Read `brief.md` and `spec.md` in full before your first change. The brief says what the user sees; the spec says what is reused. A task that contradicts either is a PLAN_ISSUE, not an instruction. Never work from a summary of either; re-read them whenever a task is ambiguous. When `spec.md` is absent, the brief alone is the authority. On a PLAN_ISSUE, build what the brief and spec say when that is unambiguous; otherwise leave that part unbuilt, and record it either way (see the Plan Feedback Protocol).
 
 Read the parent task file and ALL subtask files from `.hamster/{account}/briefs/{slug}/tasks/` — full markdown bodies, not just frontmatter. Tasks ship with rich context from upstream planning (file paths, acceptance criteria, implementation notes). Read all of them upfront to understand full scope before making any changes.
 
@@ -92,15 +94,16 @@ The task names `src/auth/login.ts` but the code moved to `src/auth/session.ts`; 
 **Tier 2 — Adapt with justification** (you found a clearly better implementation approach with the SAME outward behavior and scope):
 An existing utility already does what the task says to build; the prescribed pattern contradicts the project's established conventions. Take the better path, but it must satisfy every acceptance criterion and change nothing user-visible. Document under **Deviations** with one sentence of why — the wave reviewer will judge it.
 
-**Tier 3 — STOP and escalate** (the plan itself is wrong, not just stale):
+**Tier 3 — Resolve against authority or escalate** (the plan itself is wrong, not just stale):
 - The task is based on a false assumption about the codebase (the feature already exists, the schema doesn't match, the referenced system was removed)
 - Implementing as written would introduce a bug, security hole, data loss, or break existing behavior
 - Two of your subtasks contradict each other, or the acceptance criteria are unsatisfiable
 - The right fix changes scope, API contracts, or user-visible behavior
 
-Do NOT implement a version you believe is wrong, and do NOT silently substitute your own design. Skip that task (continue with unaffected subtasks if any are independent), and return a **PLAN_ISSUE** in your report: the task ID, what the plan assumes, what reality is, and your recommended alternative. The orchestrator decides — possibly with the user.
+Do NOT implement a version you believe is wrong, and do NOT silently substitute your own design. If a task contradicts `brief.md` or `spec.md` and those authorities give an unambiguous, safe implementation within this executor's ownership, build that implementation and record a **resolved PLAN_ISSUE**. This never overrides the existing stop for overlapping/shared-file ownership conflicts; report those to the orchestrator before editing. Otherwise skip the affected work (continue with independent, unaffected subtasks) and report an **unresolved PLAN_ISSUE** for the orchestrator to decide — possibly with the user. In either case, report the task ID, the contradiction or false assumption, the authority or reality, what was built or left unbuilt, and the resolution or recommended alternative.
+Also list every implemented authority correction under **Deviations**; retain its resolved PLAN_ISSUE history.
 
-The line between tiers: Tier 1–2 preserve the task's contract (same outcome, same scope); Tier 3 means the contract itself is broken. Mere ambiguity is not Tier 3 — take the most straightforward interpretation and note it.
+The line between tiers: Tier 1–2 preserve the task's contract (same outcome, same scope); Tier 3 means the contract itself is broken. Routine implementation ambiguity within the brief/spec authority is not Tier 3 — take the most straightforward safe interpretation and note it. Conflicting authority, unsafe ambiguity, or a decision beyond that authority stays unresolved; never guess.
 
 ### Step 6: DO NOT Run Validation
 
@@ -108,20 +111,24 @@ Do NOT run typecheck, lint, build, or test commands. Validation is handled by th
 
 ### Step 7: Mark Parent Task Done, Then Report
 
+If any subtask remains unbuilt or has an unresolved PLAN_ISSUE, do NOT mark the parent done — leave it `in_progress` and say so in the report. A resolved PLAN_ISSUE whose authority-correct implementation is complete does not block `done`. Subtasks you DID complete keep their individual `done` status (do not revert them) so `/hamster:resume-hamster` won't redo finished work.
+
+Only when all required subtasks are complete and no PLAN_ISSUE remains unresolved:
 ```bash
 hamster task status {PARENT-DISPLAY-ID} done
 ```
-
-If any subtask was escalated as PLAN_ISSUE, do NOT mark the parent done — leave it `in_progress` and say so in the report. Subtasks you DID complete keep their individual `done` status (do not revert them) so `/hamster:resume-hamster` won't redo finished work.
 
 Produce a summary:
 - Files modified (one-line description per file)
 - Files created (with purpose)
 - Subtasks completed: [HAM-X01 ✓, HAM-X02 ✓, ...]
-- **Deviations**: Tier 1/2 adaptations made, each with a one-line reason (omit section if none)
-- **PLAN_ISSUE** (if any): task ID, plan assumption vs. reality, recommended alternative
 - Any issues encountered and how resolved
 - Remaining concerns or follow-up items
+
+End the report with exactly these two sections, in this order, each under its own level-two heading. Write `None.` under a heading that has nothing to report; never omit one:
+
+- `## Deviations` — every place the build differs from a task, the brief, or the spec (including Tier 1/2 adaptations): task ID, what changed, and why.
+- `## PLAN_ISSUE` — each PLAN_ISSUE: task ID, what it contradicted in `brief.md` or `spec.md` (or plan assumption vs. reality), **resolved** or **unresolved**, what was built or left unbuilt, and the resolution or recommended alternative.
 
 ## Error Handling
 
@@ -136,7 +143,7 @@ Produce a summary:
 
 - Implement the task's intent — default to as-written; deviate only through the Plan Feedback Protocol, never silently
 - Execution-only: tasks are pre-generated upstream. Never create, split, or replan tasks yourself — plan defects go back as PLAN_ISSUE, not as your own redesign
-- If a task is merely ambiguous, implement the most straightforward interpretation and note it — ambiguity alone is not a plan issue
+- For routine implementation ambiguity within the brief/spec authority, implement the most straightforward safe interpretation and note it; unresolved authority or safety decisions are PLAN_ISSUEs
 - Do not add features, refactor surrounding code, or "improve" things beyond scope
 - Do not add docstrings/comments to code you didn't change
 - Always check for existing implementations before creating new ones
