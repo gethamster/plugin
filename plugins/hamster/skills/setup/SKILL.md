@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Install the Hamster CLI, sign in, and sync the plan into this repo. Use when the user says Install Hamster, first-run setup, or when ship/plan-hamster/resume-hamster report SETUP_NEEDED.
+description: Install the Hamster CLI if missing, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
 ---
 
 # Setup
