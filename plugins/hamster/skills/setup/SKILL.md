@@ -1,13 +1,13 @@
 ---
 name: setup
-description: Install the Hamster CLI if missing, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
+description: Get the Hamster CLI installed, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
 ---
 
 # Setup
 
 Make this workspace ready: Hamster CLI on PATH, user signed in, plan on disk in this repo's `.hamster/`.
 
-Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill is only for installing the CLI and getting the local plan.
+Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill is only for getting the CLI installed and the local plan synced.
 
 ## Readiness check
 
@@ -30,13 +30,7 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 
 ## Install the CLI
 
-If `hamster` is not on PATH (also look in `~/.hamster/bin`):
-
-```bash
-curl -fsSL https://tryhamster.com/cli/install | bash
-```
-
-Then put `~/.hamster/bin` on PATH for this session.
+If `hamster` is not on PATH (also look in `~/.hamster/bin`), follow [install-cli](references/install-cli.md), then continue here.
 
 ## Sign in
 

@@ -1,6 +1,6 @@
 {
   "name": "hamster",
-  "version": "3.4.7",
+  "version": "3.4.8",
   "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
   "author": {
     "name": "Hamster",
@@ -60,7 +60,7 @@
         }
       },
       "publication": {
-        "release_notes": "First Plugins Directory release with the hosted Hamster MCP server. From ChatGPT and Codex you can search and read briefs, plans, tasks, notes, initiatives, goals, and workspace knowledge, and create or update workspace items. Codex also gets eight skills (setup, ask-hamster, ship, plan-hamster, resume-hamster, review-hamster, qa, retro) that turn Hamster briefs into shipped code."
+        "release_notes": "First Plugins Directory release with the hosted Hamster MCP server. From ChatGPT and Codex you can search and read briefs, plans, tasks, notes, initiatives, goals, and workspace knowledge, and create or update workspace items. Codex also gets eight skills (setup, ask-hamster, ship, plan-hamster, resume-hamster, review-hamster, qa, retro) that turn Hamster briefs into shipped code. The coding skills use the Hamster CLI; when it is missing, setup asks you to install it yourself, then signs you in."
       }
     }
   }

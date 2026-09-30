@@ -27,6 +27,7 @@ const PACKAGE_ENTRIES = [
   ".agents",
   "assets",
   "scripts",
+  "codex-directory",
 ];
 
 // The folder every client installs, inside a fixture copy.
@@ -609,6 +610,26 @@ test("an uncommitted bundle source stops the build", async () => {
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Commit or stash your changes first/);
   assert.match(result.stderr, /plugins\/hamster\/skills\/ship\/SKILL\.md/);
+  assert.equal(await pathExists(zipPath), false);
+});
+
+test("a setup skill that inlines its install step again stops the Codex bundle build", async () => {
+  const cwd = await makeTemp("hamster-plugin-bundle-install-step-");
+  await copyPackage(cwd);
+  // The directory zip only swaps the reference file, so an installer written
+  // back into SKILL.md would ship to the directory unless the build refuses.
+  const installStep = plugin(cwd, "skills", "setup", "references", "install-cli.md");
+  const skillPath = plugin(cwd, "skills", "setup", "SKILL.md");
+  const skill = await readFile(skillPath, "utf8");
+  const inlined = skill.replace(/^If `hamster` is not on PATH.*$/m, await readFile(installStep, "utf8"));
+  assert.notEqual(inlined, skill);
+  await writeFile(skillPath, inlined);
+  await unlink(installStep);
+  await commitPackage(cwd);
+
+  const { result, zipPath } = await buildCodexBundle(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /skills\/setup\/references\/install-cli\.md is missing/);
   assert.equal(await pathExists(zipPath), false);
 });
 

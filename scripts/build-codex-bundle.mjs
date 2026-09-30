@@ -13,6 +13,11 @@
  * The directory can't add an MCP server to a plugin first uploaded without one,
  * so the connector ships in the first upload.
  *
+ * The directory's skill scan rejects a skill that downloads and runs code from
+ * outside the package, so setup's install step is swapped for
+ * codex-directory/install-cli.md, where the user installs the CLI themselves.
+ * Every other client keeps the agent-run installer.
+ *
  * Usage:
  *   node scripts/build-codex-bundle.mjs                 # dist/
  *   node scripts/build-codex-bundle.mjs --out build     # custom output
@@ -43,6 +48,10 @@ const EXCLUDED_MANIFEST_KEYS = ["apps", "hooks"];
 // portable format's, which would make a second, competing declaration.
 const FORBIDDEN_FILENAMES = new Set(["mcp.json", "mcp_config.json", ".app.json", "server.json", "hooks.json"]);
 const MCP_CONFIG = ".mcp.json";
+
+// The directory's copy of setup's install step, staged over the agent-run one.
+const DIRECTORY_INSTALL_STEP = path.join(repoRoot, "codex-directory", "install-cli.md");
+const SETUP_INSTALL_STEP = path.join("skills", "setup", "references", "install-cli.md");
 
 // zip writes DOS timestamps, which have no timezone and 2-second granularity, so
 // staged files are normalized to a fixed instant and zipped under TZ=UTC. Modes
@@ -156,6 +165,13 @@ async function stageBundle(stagingDir, skillNames) {
       dereference: true,
     });
   }
+  // Overwrite, never add: if setup's install step moves, the build fails rather
+  // than shipping a handoff that setup no longer links to.
+  const installStep = path.join(stagingDir, SETUP_INSTALL_STEP);
+  if (!(await pathExists(installStep))) {
+    throw new Error(`${SETUP_INSTALL_STEP} is missing from the staged skills; setup's install step moved.`);
+  }
+  await fs.cp(DIRECTORY_INSTALL_STEP, installStep);
 
   // One assets/ tree, from the repository root. plugins/hamster/assets/ is the
   // marketplace copy of the three PNGs; copying it too would archive them twice.
