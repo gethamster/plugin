@@ -595,8 +595,8 @@ async function validateCodexInterface(iface) {
   }
 
   // Exactly the three listing images, at the paths Codex resolves inside the
-  // installed plugin folder. screenshots stay unset because plugins/hamster
-  // allows no other image, and any other image path is a bundled image held for review.
+  // installed plugin folder. screenshots stay unset: the directory allows them
+  // only for an MCP server with a custom UI, which Hamster's has none of.
   for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
     if (iface[field] !== expected) {
       codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
@@ -621,7 +621,7 @@ async function validateCodexInterface(iface) {
     }
   }
   if (iface.screenshots !== undefined) {
-    codexError("screenshots", "must not be set; plugins/hamster carries no screenshot images.");
+    codexError("screenshots", "must not be set; the directory allows screenshots only for an MCP server with custom UI.");
   }
 }
 

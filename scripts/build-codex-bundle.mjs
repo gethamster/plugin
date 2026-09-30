@@ -34,14 +34,14 @@ const LISTING_IMAGES = {
   logoDark: "./assets/logo-dark.png",
 };
 
-// https://developers.openai.com/plugins/deploy/submit: ZIPs that declare apps
-// can't be submitted.
-const EXCLUDED_MANIFEST_KEYS = ["apps"];
+// https://developers.openai.com/plugins/deploy/submit: ZIPs with app references
+// or lifecycle hooks can't be submitted.
+const EXCLUDED_MANIFEST_KEYS = ["apps", "hooks"];
 
 // .mcp.json is the one MCP config Codex reads. mcp_config.json and server.json
 // are this repo's other MCP dialects for other clients, and mcp.json is the
 // portable format's, which would make a second, competing declaration.
-const FORBIDDEN_FILENAMES = new Set(["mcp.json", "mcp_config.json", ".app.json", "server.json"]);
+const FORBIDDEN_FILENAMES = new Set(["mcp.json", "mcp_config.json", ".app.json", "server.json", "hooks.json"]);
 const MCP_CONFIG = ".mcp.json";
 
 // zip writes DOS timestamps, which have no timezone and 2-second granularity, so
