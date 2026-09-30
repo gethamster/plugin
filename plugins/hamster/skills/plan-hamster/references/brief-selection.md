@@ -1,6 +1,6 @@
 # Account Resolution, Brief Selection, and Scheduling
 
-Canonical source: `skills/ship/references/brief-selection.md`. It is copied byte-for-byte into plan-hamster and resume-hamster because every skill directory is self-contained; `scripts/validate-plugin.mjs` rejects divergent copies. Edit the canonical file and copy it to both consumers. All three skills run Account Resolution before their own setup; plan runs Brief Selection and Scheduling, while resume re-enters Scheduling.
+Canonical source: `skills/ship/references/brief-selection.md`. It is copied byte-for-byte into plan-hamster and resume-hamster because every skill directory is self-contained; `scripts/validate-plugin.mjs` rejects divergent copies. Edit the canonical file and copy it to both consumers. All three skills run Account Resolution before their own setup; plan runs Brief Selection and Scheduling, while resume uses Brief Selection for an explicit argument and re-enters Scheduling.
 
 ## Account Resolution
 

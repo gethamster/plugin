@@ -59,7 +59,7 @@ done
 ```
 
 Resolution order:
-1. **Argument provided** → use it as the slug (verify `brief.md` exists)
+1. **Argument provided** → run **Brief Selection → If argument provided** in [brief-selection](references/brief-selection.md) and use its resolved `$slug`. If selection asks, wait for the user's answer; do not fall through to the signals below. With no argument, use steps 2–4 instead of that reference's no-argument picker.
 2. **Branch matches** `feature/{key}-{n}-{slug}` (`{key}` is the tasks' display ID key, lowercased, e.g. `ham`, `acme`) → extract the slug
 3. **One brief** has in_progress tasks → use it; **multiple** → ask the user
 4. **None** → tell the user nothing to resume; suggest `/hamster:ship`
