@@ -22,12 +22,13 @@ Each worker receives: parent display ID, subtask display IDs in order, brief slu
 
 Wait for all to complete; collect each executor's file list, deviations, and any PLAN_ISSUE.
 
-**Handling PLAN_ISSUE** (executor found a defect in the plan and skipped that task):
+**Handling PLAN_ISSUE** (resolved authority-correct work or unresolved/skipped work):
 
-1. Verify the claim yourself — read the cited code/task; executors can be wrong too
-2. **Local fix, same scope** (stale assumption with an obvious correct implementation): re-launch that task-executor with the corrected instruction; note it in the wave report
-3. **Scope, API, or user-visible behavior change — or the task is obsolete** (already implemented, feature removed): ask the user with the executor's recommendation as the lead option ("Apply recommended alternative" / "Implement as originally written" / "Skip this task"). Never silently drop or rewrite a task
-4. Record the resolution; surface all plan issues and deviations in the final report and PR body so they flow back into Hamster Studio
+1. Verify the claim yourself — read the cited brief/spec, code, and task; executors can be wrong too.
+2. **Resolved and built against unambiguous brief/spec authority**: retain the resolution for review and feedback; do not re-launch or ask permission merely because the corrected implementation differs from the task. Authority corrections must respect executor ownership and the existing overlapping/shared-file stop; they do not authorize conflicting edits. If all required work is complete and no issue remains unresolved, the parent can be `done`.
+3. **Unresolved, local fix within the same authority and scope** (stale assumption with an obvious safe implementation): re-launch that task-executor with the corrected instruction; leave the parent `in_progress` until the affected work is complete.
+4. **Actual scope, API, or user-visible behavior change beyond brief/spec authority, an unresolved decision, or an obsolete task without a clear authoritative resolution**: ask the user with the executor's recommendation as the lead option. Never offer an unsafe or authority-contradicting implementation as a valid choice, and never silently drop or rewrite required work.
+5. Record whether each issue is resolved or unresolved and what was built or skipped; retain prior resolutions across waves and resumes. Surface all plan issues and deviations in the final report and PR body.
 
 Tier 1/2 deviations (documented adaptations with unchanged outcome) need no action here — the wave reviewer judges them.
 
@@ -53,9 +54,9 @@ fi
 
 ### 3. Wave Review
 
-**Fast path**: if the wave diff is small (< ~150 changed lines) AND touches no sensitive areas, review the diff yourself inline against project conventions — no agent needed. Sensitive areas: auth, payments, migrations, security, CI workflows (`.github/workflows/`), env/secret config files, public API type definitions, and new dependencies (additions to package manifests — version bumps alone don't count).
+**Fast path**: if the wave diff is small (< ~150 changed lines) AND touches no sensitive areas, review it yourself inline using the same `references/agents/wave-reviewer.md` protocol, including full reads of `brief.md` and any `spec.md`, its authority hierarchy, deviation/PLAN_ISSUE audit, and per-parent verdicts — no agent needed. Sensitive areas: auth, payments, migrations, security, CI workflows (`.github/workflows/`), env/secret config files, public API type definitions, and new dependencies (additions to package manifests — version bumps alone don't count).
 
-Otherwise launch one isolated **wave-reviewer** with: wave number, parent IDs, per-parent file lists, per-parent deviations, and the paths to `brief.md` and `spec.md` (not a summary). Same delivery order as task-executor: prefer the registered native `wave-reviewer` agent when the client exposes it (Claude keeps `model: sonnet`); otherwise launch a generic subagent and inject `references/agents/wave-reviewer.md` from this skill directory; otherwise review inline. On the generic path, prefer a mid-tier model when the client lets you pin one; otherwise inherit. It returns per-parent PASS/NEEDS_FIXES verdicts and applies simplifications for passing parents.
+Otherwise launch one isolated **wave-reviewer** with: wave number, parent IDs, per-parent file lists, per-parent deviations and PLAN_ISSUEs (including resolution and built/skipped work), and the paths to `brief.md` and `spec.md` (not a summary). Same delivery order as task-executor: prefer the registered native `wave-reviewer` agent when the client exposes it (Claude keeps `model: sonnet`); otherwise launch a generic subagent and inject `references/agents/wave-reviewer.md` from this skill directory; otherwise review inline. On the generic path, prefer a mid-tier model when the client lets you pin one; otherwise inherit. It returns per-parent PASS/NEEDS_FIXES verdicts and applies simplifications for passing parents.
 
 **NEEDS_FIXES handling** (per parent): small issues (1-3 files) → apply the change directly; larger → re-launch task-executor with the issue list. Max 2 review rounds, then report to user.
 
@@ -100,7 +101,9 @@ kill {literal-sync-pid} 2>/dev/null
 
 If the final formatter pass leaves a diff (e.g. from post-review edits), commit it before the PR: `git add -u && git commit -m "style: apply repository formatter"`.
 
-**PR** — Ask the user ("Create a PR?" yes/later). If yes, inline (no agent):
+**PR feedback aggregation is mandatory**: collect every executor's deviations and PLAN_ISSUEs across all waves, including earlier completed tasks on resume. Retain prior task completion and feedback resolutions from available reports and any existing PR body; merge new entries by task and issue, updating their resolution without erasing their history. Do not replace prior feedback with `None reported.` merely because this resumed wave has none. Only mark completed tasks checked; keep unresolved or unbuilt work explicit.
+
+**PR** — First check whether this branch already has a PR (`gh pr view --json url,body`). Only an explicit no-PR result establishes absence; on auth, network, or other lookup errors, report and stop instead of treating the PR as absent or asking to create one. If it does, push the completed commits and update its body with `gh pr edit --body` using the merged task status and Plan Feedback above; preserve the other existing body content and report its URL. A push alone does not update PR feedback. If no PR exists, ask the user ("Create a PR?" yes/later). Only if yes, inline (no agent):
 
 ```bash
 git push -u origin HEAD
@@ -123,7 +126,7 @@ gh pr create --base "$default_branch" --title "{brief title, <70 chars}" --body 
 
 ### PLAN_ISSUEs
 
-{each PLAN_ISSUE: task id, what it contradicted in `brief.md` or `spec.md`, how it was resolved — or `None reported.`}
+{each PLAN_ISSUE: task id, what it contradicted in `brief.md` or `spec.md`, resolved/unresolved, what was built or left unbuilt, and the resolution or pending decision — or `None reported.`}
 
 Brief: {slug}
 EOF

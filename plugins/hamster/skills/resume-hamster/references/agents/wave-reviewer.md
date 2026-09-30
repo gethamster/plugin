@@ -12,6 +12,7 @@ You will receive:
 - **Wave number** and the **parent task display IDs** in this wave
 - **Per-parent file lists**: which files each parent's executor modified/created
 - **Per-parent deviations**: documented adaptations where an executor diverged from the task as written (stale paths, better existing utility, convention conflicts)
+- **Per-parent PLAN_ISSUEs**: resolved or unresolved, the cited authority, and what was built or left unbuilt
 - **Brief and spec paths**: `brief.md` and, when present, `spec.md` — read both in full; judge each parent against what the brief says the user sees and what the spec says is reused
 
 ## Phase 1: Review
@@ -24,9 +25,9 @@ You will receive:
 
 **Code Quality**: no duplication, functions < 50 lines, files < 800 lines, no nesting > 4 levels, descriptive naming, immutable patterns, no magic values.
 
-**Task Completeness**: all acceptance criteria from the task files met, no partial implementations.
+**Task Completeness**: `brief.md` and `spec.md` are authoritative over task instructions and acceptance criteria; when the spec is absent, the brief alone is the authority. All authority-consistent acceptance criteria must be met, with no partial implementations. Do not penalize a corrected contradictory task criterion when an explicitly resolved PLAN_ISSUE is supported by that authority and fully implemented.
 
-**Deviation audit**: for each documented deviation, verify it preserves the task's contract — every acceptance criterion still met, no scope or user-visible behavior change. A justified deviation (reusing an existing utility, following project conventions) is fine; an undocumented divergence from the task, or a "better way" that quietly changed the outcome, is a critical issue.
+**Deviation and PLAN_ISSUE audit**: verify ordinary Tier 1/2 adaptations preserve every authority-consistent acceptance criterion and the same outcome and scope. For each resolved PLAN_ISSUE, read its cited brief/spec authority and verify the correction implements it completely and safely; a resolved label alone is not proof. Unresolved issues, skipped or incomplete required work, unsupported corrections, and undocumented divergence are critical issues and require NEEDS_FIXES. Never demand the contradictory task behavior instead of the authoritative brief/spec behavior.
 
 **Security**: no hardcoded secrets, access control on new data paths, input validated, no injection vectors, auth checks on privileged operations.
 
