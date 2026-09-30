@@ -596,7 +596,7 @@ async function validateCodexInterface(iface) {
 
   // Exactly the three listing images, at the paths Codex resolves inside the
   // installed plugin folder. screenshots stay unset: the directory allows them
-  // only for an MCP server with a custom UI, which Hamster's has none of.
+  // only for an MCP server with a custom UI, and Hamster's has none.
   for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
     if (iface[field] !== expected) {
       codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);

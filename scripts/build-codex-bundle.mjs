@@ -235,7 +235,7 @@ async function verifyStaging(stagingDir, skillNames) {
 
   for (const file of await walkFiles(stagingDir)) {
     if (FORBIDDEN_FILENAMES.has(path.basename(file))) {
-      throw new Error(`The bundle must not carry a second MCP or app configuration: ${file}`);
+      throw new Error(`The bundle must not carry hooks, app configuration, or a second MCP configuration: ${file}`);
     }
   }
 }
