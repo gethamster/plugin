@@ -498,7 +498,7 @@ const codexListing = {
   defaultPrompt: { max: 3, chars: 128 },
 };
 
-// Marketplace installs resolve these inside the plugin folder. The skills-only
+// Marketplace installs resolve these inside the plugin folder. The directory
 // zip still copies the same three files once from the root assets/.
 const CODEX_LISTING_IMAGES = {
   composerIcon: "./assets/icon.png",
@@ -595,8 +595,8 @@ async function validateCodexInterface(iface) {
   }
 
   // Exactly the three listing images, at the paths Codex resolves inside the
-  // installed plugin folder. screenshots stay unset: a skills-only upload rejects
-  // them, and any other image path is still a bundled image held for review.
+  // installed plugin folder. screenshots stay unset because plugins/hamster
+  // allows no other image, and any other image path is a bundled image held for review.
   for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
     if (iface[field] !== expected) {
       codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
@@ -621,7 +621,7 @@ async function validateCodexInterface(iface) {
     }
   }
   if (iface.screenshots !== undefined) {
-    codexError("screenshots", "must not be set; a skills-only bundle excludes screenshots.");
+    codexError("screenshots", "must not be set; plugins/hamster carries no screenshot images.");
   }
 }
 
@@ -696,9 +696,7 @@ async function validateMcpFiles() {
 }
 
 // The four plugin manifests are hand-maintained copies of one package summary.
-// The Codex copy also ships inside the skills-only bundle, so the summary must
-// read true for an install with no MCP connector, and binding the four means
-// that wording cannot be re-synced away by hand.
+// Binding them means a wording fix in one cannot be re-synced away by hand.
 async function validateDescriptionParity() {
   const descriptions = new Map();
   for (const file of ["plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
