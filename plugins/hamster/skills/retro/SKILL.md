@@ -1,6 +1,6 @@
 ---
 name: retro
-description: Review recent development activity from git history. Summarize team metrics, contributor activity, trends, and suggested next steps. Use when the user wants an engineering retrospective.
+description: Review recent development activity from git history. Summarize team metrics, contributor activity, trends, and suggested next steps. Use when the user wants a retrospective or a summary of recent development activity.
 ---
 
 # Retro

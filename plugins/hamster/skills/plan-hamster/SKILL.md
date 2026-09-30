@@ -1,6 +1,6 @@
 ---
 name: plan-hamster
-description: Analyze a Hamster brief before execution. Read its tasks, map dependencies, and group work into parallel waves, with optional CEO or Eng review. Use when the user wants to assess an existing brief and plan before building.
+description: Analyze an existing Hamster Brief and Plan before building. Read its tasks, map dependencies, and group work into parallel waves, with optional CEO or Eng review. Use when the user wants to assess an existing brief and plan before building.
 ---
 
 # Plan Brief

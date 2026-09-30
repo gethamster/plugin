@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "Ask Hamster and ship briefs",
-    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. In Codex, work through existing brief plans to build, test, and review code, with your approval before pushing or opening a pull request. In ChatGPT, Hamster uses its hosted MCP server; skills that run the CLI and git work locally in Codex, not ChatGPT.",
+    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster’s hosted MCP server. In Codex, build, test, and review code from existing Briefs and Plans, with your approval before pushing or opening a pull request. Coding skills need access to your repository and a shell.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],

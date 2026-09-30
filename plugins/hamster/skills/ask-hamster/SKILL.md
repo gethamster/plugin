@@ -1,6 +1,6 @@
 ---
 name: ask-hamster
-description: Ask Hamster how the current code or editor context relates to workspace priorities, blockers, blueprints, related work, or decisions. Also supports workspace actions the user explicitly requests.
+description: Ask Hamster how the current code or editor context relates to workspace priorities, blockers, blueprints, related work, intent, or decisions. Also supports workspace actions the user explicitly requests.
 ---
 
 # Ask Hamster
