@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * Stage and zip the skills-only package uploaded to Codex's Plugins Directory.
+ * Stage and zip the plugin package uploaded to OpenAI's Plugins Directory.
  *
- * A skills-only submission excludes MCP, app, and screenshot configuration, so
- * the bundle carries the Codex manifest from plugins/hamster stripped of those
- * keys, with the listing images from the root assets/ added, alongside the
- * skills tree and the license. plugins/hamster also carries those same three
- * PNGs for a marketplace install. This zip copies the root assets/ once and
- * does not also copy plugins/hamster/assets, so the archive does not contain
- * the same image twice.
+ * The bundle is the Codex manifest from plugins/hamster, its .mcp.json (the
+ * hosted Hamster MCP server), the skills tree, and the license. The listing
+ * images come from the root assets/. plugins/hamster also carries those same
+ * three PNGs for a marketplace install; this zip copies the root assets/ once
+ * and does not also copy plugins/hamster/assets, so the archive does not
+ * contain the same image twice.
+ *
+ * The directory can't add an MCP server to a plugin first uploaded without one,
+ * so the connector ships in the first upload.
  *
  * Usage:
- *   node scripts/build-codex-skills-bundle.mjs                 # dist/
- *   node scripts/build-codex-skills-bundle.mjs --out build     # custom output
+ *   node scripts/build-codex-bundle.mjs                 # dist/
+ *   node scripts/build-codex-bundle.mjs --out build     # custom output
  */
 
 import { execFileSync } from "node:child_process";
@@ -32,23 +34,15 @@ const LISTING_IMAGES = {
   logoDark: "./assets/logo-dark.png",
 };
 
-// https://developers.openai.com/plugins/deploy/submission-errors names each
-// exclusion a skills-only upload is rejected for: mcp_configuration_excluded
-// (mcpServers), app_configuration_excluded (apps), and
-// screenshot_configuration_excluded (interface.screenshots).
-const EXCLUDED_MANIFEST_KEYS = ["mcpServers", "apps"];
-const EXCLUDED_INTERFACE_KEYS = ["screenshots"];
+// https://developers.openai.com/plugins/deploy/submission: ZIPs with app references
+// or lifecycle hooks can't be submitted.
+const EXCLUDED_MANIFEST_KEYS = ["apps", "hooks"];
 
-// The same rules exclude .mcp.json, mcp.json, and .app.json by name.
-// mcp_config.json and server.json are this repo's remaining MCP dialects, which
-// the portal does not name but which carry the same endpoint.
-const FORBIDDEN_FILENAMES = new Set([
-  ".mcp.json",
-  "mcp.json",
-  "mcp_config.json",
-  ".app.json",
-  "server.json",
-]);
+// .mcp.json is the one MCP config Codex reads. mcp_config.json and server.json
+// are this repo's other MCP dialects for other clients, and mcp.json is the
+// portable format's, which would make a second, competing declaration.
+const FORBIDDEN_FILENAMES = new Set(["mcp.json", "mcp_config.json", ".app.json", "server.json", "hooks.json"]);
+const MCP_CONFIG = ".mcp.json";
 
 // zip writes DOS timestamps, which have no timezone and 2-second granularity, so
 // staged files are normalized to a fixed instant and zipped under TZ=UTC. Modes
@@ -150,9 +144,6 @@ async function stageBundle(stagingDir, skillNames) {
   for (const key of EXCLUDED_MANIFEST_KEYS) {
     delete manifest[key];
   }
-  for (const key of EXCLUDED_INTERFACE_KEYS) {
-    delete manifest.interface?.[key];
-  }
   Object.assign(manifest.interface, LISTING_IMAGES);
   await fs.writeFile(
     path.join(stagingDir, ".codex-plugin", "plugin.json"),
@@ -182,6 +173,7 @@ async function stageBundle(stagingDir, skillNames) {
       }
     }
   }
+  await fs.cp(path.join(pluginDir, MCP_CONFIG), path.join(stagingDir, MCP_CONFIG));
   await fs.cp(path.join(repoRoot, "LICENSE"), path.join(stagingDir, "LICENSE"));
 }
 
@@ -213,13 +205,17 @@ async function verifyStaging(stagingDir, skillNames) {
 
   for (const key of EXCLUDED_MANIFEST_KEYS) {
     if (manifest[key] !== undefined) {
-      throw new Error(`A skills-only bundle must not declare ${key}.`);
+      throw new Error(`The bundle manifest must not declare ${key}.`);
     }
   }
-  for (const key of EXCLUDED_INTERFACE_KEYS) {
-    if (manifest.interface?.[key] !== undefined) {
-      throw new Error(`A skills-only bundle must not declare interface.${key}.`);
-    }
+
+  if (manifest.mcpServers !== `./${MCP_CONFIG}`) {
+    throw new Error(`The bundle manifest must set mcpServers to "./${MCP_CONFIG}".`);
+  }
+  // The directory connects one MCP server per plugin.
+  const servers = Object.keys((await readJsonFile(path.join(stagingDir, MCP_CONFIG))).mcpServers ?? {});
+  if (servers.length !== 1) {
+    throw new Error(`${MCP_CONFIG} must declare exactly one MCP server, found ${servers.length}.`);
   }
 
   for (const field of Object.keys(LISTING_IMAGES)) {
@@ -239,7 +235,7 @@ async function verifyStaging(stagingDir, skillNames) {
 
   for (const file of await walkFiles(stagingDir)) {
     if (FORBIDDEN_FILENAMES.has(path.basename(file))) {
-      throw new Error(`A skills-only bundle must not carry MCP or app configuration: ${file}`);
+      throw new Error(`The bundle must not carry hooks, app configuration, or a second MCP configuration: ${file}`);
     }
   }
 }
@@ -318,14 +314,14 @@ async function main() {
     throw new Error("plugins/hamster/plugin.json has no version.");
   }
 
-  const stagingDir = path.join(outDir, "codex-skills-only");
+  const stagingDir = path.join(outDir, "codex-plugin");
   const skillNames = await listSkillNames();
 
   await stageBundle(stagingDir, skillNames);
   await verifyStaging(stagingDir, skillNames);
   const members = await normalizeStaging(stagingDir);
 
-  const zipPath = path.join(outDir, `hamster-codex-skills-only-${version}.zip`);
+  const zipPath = path.join(outDir, `hamster-codex-${version}.zip`);
   await fs.rm(zipPath, { force: true });
   writeZip(stagingDir, zipPath, members);
 

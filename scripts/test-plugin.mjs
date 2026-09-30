@@ -14,7 +14,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 // fixture copy, or the checkout for the setup scripts), never by an absolute
 // path built from where the checkout happens to live.
 const VALIDATOR = "scripts/validate-plugin.mjs";
-const BUNDLE_BUILDER = "scripts/build-codex-skills-bundle.mjs";
+const BUNDLE_BUILDER = "scripts/build-codex-bundle.mjs";
 const READY_SCRIPT = "plugins/hamster/skills/setup/scripts/ensure-ready.sh";
 
 const PACKAGE_ENTRIES = [
@@ -125,7 +125,7 @@ async function buildCodexBundle(cwd, args = []) {
   const outDir = path.join(cwd, "dist");
   const result = await run(process.execPath, [BUNDLE_BUILDER, "--out", outDir, ...args], { cwd });
   const version = JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version;
-  return { result, zipPath: path.join(outDir, `hamster-codex-skills-only-${version}.zip`) };
+  return { result, zipPath: path.join(outDir, `hamster-codex-${version}.zip`) };
 }
 
 async function zipEntries(zipPath) {
@@ -309,6 +309,57 @@ test("a dropped Codex support link fails validation", async () => {
   assert.match(result.stderr, /interface\.supportURL must be a non-empty string/);
 });
 
+test("a fourth Codex negative review case fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-review-count-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    const cases = manifest.extensions["com.openai"].review.test_cases.negative;
+    cases.push({ ...cases[0] });
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /review\.test_cases\.negative must have exactly 3 entries/);
+});
+
+test("Codex reviewer credentials in the manifest fail validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-review-credentials-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.extensions["com.openai"].review.test_credentials = "secret";
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /review\.test_credentials must not be included/);
+});
+
+test("a missing Codex onboarding skill fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-onboarding-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.extensions["com.openai"].onboardingSkill = "./skills/missing/SKILL.md";
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /onboardingSkill must point to an existing skills\/<name>\/SKILL\.md/);
+});
+
+for (const [kind, field] of [
+  ["positive", "tools_triggered"],
+  ["positive", "expected_behavior"],
+  ["negative", "prompt"],
+]) {
+  test(`an empty Codex ${kind} review ${field} fails validation`, async () => {
+    const cwd = await makeTemp("hamster-plugin-codex-review-field-");
+    await copyPackage(cwd);
+    await patchCodexManifest(cwd, (manifest) => {
+      manifest.extensions["com.openai"].review.test_cases[kind][0][field] = "   ";
+    });
+    const result = await runValidator(cwd);
+    assert.notEqual(result.code, 0);
+    assert.ok(result.stderr.includes(`review.test_cases.${kind}[0].${field} must be a non-empty string`), result.stderr);
+  });
+}
+
 test("a Codex catalog category that drifts from the manifest fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-catalog-");
   await copyPackage(cwd);
@@ -476,7 +527,7 @@ test("a drifted duplicate fails validation", async () => {
   assert.match(result.stderr, /Duplicated copies have diverged and must stay byte-identical/);
 });
 
-test("the Codex bundle carries only skills, assets, and a stripped manifest", async () => {
+test("the Codex bundle carries the manifest, the MCP server, skills, and assets", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-");
   await copyPackage(cwd);
   await patchCodexManifest(cwd, (manifest) => {
@@ -494,19 +545,24 @@ test("the Codex bundle carries only skills, assets, and a stripped manifest", as
   for (const skill of skillDirs) {
     assert.ok(entries.includes(`skills/${skill.name}/SKILL.md`), `expected skills/${skill.name}/SKILL.md`);
   }
-  for (const expected of [".codex-plugin/plugin.json", "assets/icon.png", "assets/logo.png", "assets/logo-dark.png", "LICENSE"]) {
+  for (const expected of [".codex-plugin/plugin.json", ".mcp.json", "assets/icon.png", "assets/logo.png", "assets/logo-dark.png", "LICENSE"]) {
     assert.ok(entries.includes(expected), `expected ${expected} in ${entries.join(", ")}`);
   }
-  for (const forbidden of ["plugin.json", "mcp.json", ".mcp.json", "mcp_config.json", "agents/task-executor.md"]) {
+  for (const forbidden of ["plugin.json", "mcp.json", "mcp_config.json", "agents/task-executor.md"]) {
     assert.ok(!entries.includes(forbidden), `did not expect ${forbidden} in the bundle`);
   }
 
   const manifestDump = await run("unzip", ["-p", zipPath, ".codex-plugin/plugin.json"]);
   assert.equal(manifestDump.code, 0, manifestDump.stderr);
   const manifest = JSON.parse(manifestDump.stdout);
-  assert.equal(Object.hasOwn(manifest, "mcpServers"), false);
+  assert.equal(manifest.mcpServers, "./.mcp.json");
+  assert.equal(manifest.extensions["com.openai"].review.test_cases.positive.length, 5);
+  assert.equal(manifest.extensions["com.openai"].review.test_cases.negative.length, 3);
+  assert.ok(entries.includes(manifest.extensions["com.openai"].onboardingSkill.slice(2)));
   assert.equal(Object.hasOwn(manifest, "apps"), false);
-  assert.equal(Object.hasOwn(manifest.interface, "screenshots"), false);
+  const mcpDump = await run("unzip", ["-p", zipPath, ".mcp.json"]);
+  assert.equal(mcpDump.code, 0, mcpDump.stderr);
+  assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, "https://tryhamster.com/mcp");
   assert.equal(manifest.interface.displayName, "Hamster");
   // Root assets/ is copied once. plugins/hamster/assets/ is not archived beside it.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
@@ -535,7 +591,7 @@ test("archive bytes follow the checkout, not the machine building it", async () 
     const result = await pending;
     assert.equal(result.code, 0, result.stderr);
     const version = JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version;
-    const zipPath = path.join(cwd, "dist", `hamster-codex-skills-only-${version}.zip`);
+    const zipPath = path.join(cwd, "dist", `hamster-codex-${version}.zip`);
     digests.push(createHash("sha256").update(await readFile(zipPath)).digest("hex"));
   }
 
