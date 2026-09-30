@@ -29,7 +29,7 @@ Windows:
 $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Test-Path "$SkillDir\scripts\ensure-ready.ps1") { pwsh "$SkillDir\scripts\ensure-ready.ps1" } else { $env:PATH = "$env:USERPROFILE\.hamster\bin;" + $env:PATH; if (Get-Command hamster -ErrorAction SilentlyContinue) { $status = & hamster --no-tui status 2>&1 | Out-String; if ($LASTEXITCODE -eq 0 -and $status -cmatch "Logged in") { $syncOut = & hamster sync 2>&1; if ($LASTEXITCODE -eq 0) { "READY" } else { [Console]::Error.WriteLine(($syncOut | Out-String).TrimEnd()); "SETUP_NEEDED"; exit 1 } } else { [Console]::Error.WriteLine($status.TrimEnd()); "SETUP_NEEDED"; exit 1 } } else { "SETUP_NEEDED"; exit 1 } }
 ```
 
-If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`, re-run only this readiness command with elevated permission. The default workspace sandbox cannot read Keychain credentials, and an extra directory grant does not change that. If the elevated check prints `READY`, continue. Only if it still prints `SETUP_NEEDED`, run this plugin's `setup` skill, then re-run the check. Do not continue until it prints `READY`.
+If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`, the sandbox may be blocking Keychain access. Ask the user to approve re-running only this readiness command outside the sandbox, and tell them why: Hamster keeps its sign-in in the macOS Keychain, which the default workspace sandbox can't read. Run nothing else outside the sandbox. If the user declines, stop and say setup can't be confirmed. If the approved check prints `READY`, continue. Only if it still prints `SETUP_NEEDED`, run this plugin's `setup` skill, then re-run the check. Do not continue until it prints `READY`.
 
 ## Setup
 
