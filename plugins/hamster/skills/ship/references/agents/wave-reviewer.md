@@ -12,7 +12,7 @@ You will receive:
 - **Wave number** and the **parent task display IDs** in this wave
 - **Per-parent file lists**: which files each parent's executor modified/created
 - **Per-parent deviations**: documented adaptations where an executor diverged from the task as written (stale paths, better existing utility, convention conflicts)
-- **Brief context**: summary of the overall brief goals
+- **Brief and spec paths**: `brief.md` and, when present, `spec.md` — read both in full; judge each parent against what the brief says the user sees and what the spec says is reused
 
 ## Phase 1: Review
 

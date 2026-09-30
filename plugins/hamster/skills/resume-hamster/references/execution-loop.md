@@ -18,7 +18,7 @@ Launch a worker for EVERY **task-executor** in this wave in one batch, using wha
 2. **Generic subagent + canonical body** — otherwise launch a generic subagent / worker and inject `references/agents/task-executor.md` from this skill directory as its full instructions. Prefer the client's strongest available coding model when the client lets you pin a model; otherwise inherit.
 3. **Inline** — if the client has no subagent/worker primitive, execute that same protocol in this session.
 
-Each worker receives: parent display ID, subtask display IDs in order, brief slug, account slug, and a 2-3 sentence brief context summary. Executors load project skills and discover codebase context themselves — do not pre-chew context for them.
+Each worker receives: parent display ID, subtask display IDs in order, brief slug, account slug, and the paths to `brief.md` and `spec.md` in the brief's `.hamster/{account}/briefs/{slug}/` folder (`spec.md` is absent when the brief has no spec; then the brief alone is the authority). Do not summarise either file for the executor, and tell it: "Read `brief.md` and `spec.md` in full before your first change. The brief says what the user sees; the spec says what is reused. A task that contradicts either is a PLAN_ISSUE, not an instruction." Executors load project skills and discover codebase context themselves — do not pre-chew context for them.
 
 Wait for all to complete; collect each executor's file list, deviations, and any PLAN_ISSUE.
 
@@ -55,7 +55,7 @@ fi
 
 **Fast path**: if the wave diff is small (< ~150 changed lines) AND touches no sensitive areas, review the diff yourself inline against project conventions — no agent needed. Sensitive areas: auth, payments, migrations, security, CI workflows (`.github/workflows/`), env/secret config files, public API type definitions, and new dependencies (additions to package manifests — version bumps alone don't count).
 
-Otherwise launch one isolated **wave-reviewer** with: wave number, parent IDs, per-parent file lists, brief context. Same delivery order as task-executor: prefer the registered native `wave-reviewer` agent when the client exposes it (Claude keeps `model: sonnet`); otherwise launch a generic subagent and inject `references/agents/wave-reviewer.md` from this skill directory; otherwise review inline. On the generic path, prefer a mid-tier model when the client lets you pin one; otherwise inherit. It returns per-parent PASS/NEEDS_FIXES verdicts and applies simplifications for passing parents.
+Otherwise launch one isolated **wave-reviewer** with: wave number, parent IDs, per-parent file lists, per-parent deviations, and the paths to `brief.md` and `spec.md` (not a summary). Same delivery order as task-executor: prefer the registered native `wave-reviewer` agent when the client exposes it (Claude keeps `model: sonnet`); otherwise launch a generic subagent and inject `references/agents/wave-reviewer.md` from this skill directory; otherwise review inline. On the generic path, prefer a mid-tier model when the client lets you pin one; otherwise inherit. It returns per-parent PASS/NEEDS_FIXES verdicts and applies simplifications for passing parents.
 
 **NEEDS_FIXES handling** (per parent): small issues (1-3 files) → apply the change directly; larger → re-launch task-executor with the issue list. Max 2 review rounds, then report to user.
 
@@ -116,7 +116,14 @@ gh pr create --base "$default_branch" --title "{brief title, <70 chars}" --body 
 {grouped by area}
 
 ## Plan Feedback
-{deviations and plan issues encountered + how resolved — omit section if none}
+
+### Deviations
+
+{every place the build differs from a task, the brief, or the spec: task id, what changed, why — or `None reported.`}
+
+### PLAN_ISSUEs
+
+{each PLAN_ISSUE: task id, what it contradicted in `brief.md` or `spec.md`, how it was resolved — or `None reported.`}
 
 Brief: {slug}
 EOF

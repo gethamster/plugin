@@ -19,11 +19,13 @@ You will receive:
 - **Parent Display ID**: The HAM-XXX identifier for the parent task
 - **Subtask Display IDs**: All HAM-XXX identifiers for subtasks under this parent (in order)
 - **Brief slug** and **Account slug**
-- **Brief context**: Summary of the overall brief goals
+- **Brief and spec paths**: `brief.md` and, when the brief has one, `spec.md` in `.hamster/{account}/briefs/{slug}/`
 
 ## Implementation Workflow
 
 ### Step 1: Read All Task Requirements
+
+Read `brief.md` and `spec.md` in full before your first change. The brief says what the user sees; the spec says what is reused. A task that contradicts either is a PLAN_ISSUE, not an instruction. Never work from a summary of either; re-read them whenever a task is ambiguous. When `spec.md` is absent, the brief alone is the authority. On a PLAN_ISSUE, build what the brief and spec say when that is unambiguous; otherwise leave that part unbuilt, and record it either way (see the Plan Feedback Protocol).
 
 Read the parent task file and ALL subtask files from `.hamster/{account}/briefs/{slug}/tasks/` — full markdown bodies, not just frontmatter. Tasks ship with rich context from upstream planning (file paths, acceptance criteria, implementation notes). Read all of them upfront to understand full scope before making any changes.
 
@@ -118,10 +120,13 @@ Produce a summary:
 - Files modified (one-line description per file)
 - Files created (with purpose)
 - Subtasks completed: [HAM-X01 ✓, HAM-X02 ✓, ...]
-- **Deviations**: Tier 1/2 adaptations made, each with a one-line reason (omit section if none)
-- **PLAN_ISSUE** (if any): task ID, plan assumption vs. reality, recommended alternative
 - Any issues encountered and how resolved
 - Remaining concerns or follow-up items
+
+End the report with exactly these two sections, in this order, each under its own level-two heading. Write `None.` under a heading that has nothing to report; never omit one:
+
+- `## Deviations` — every place the build differs from a task, the brief, or the spec (including Tier 1/2 adaptations): task ID, what changed, and why.
+- `## PLAN_ISSUE` — each PLAN_ISSUE: task ID, what it contradicted in `brief.md` or `spec.md` (or plan assumption vs. reality), your recommended alternative, and how it was resolved.
 
 ## Error Handling
 
