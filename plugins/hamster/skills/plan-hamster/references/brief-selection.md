@@ -67,7 +67,7 @@ if echo "$identifier" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
   done
 else slug="$identifier"; fi
 if [ -f ".hamster/${account}/briefs/${slug}/brief.md" ]; then echo "FOUND: $slug"
-else echo "NOT_FOUND: $identifier"; ls -d .hamster/${account}/briefs/*${slug}*/ 2>/dev/null | head -5; fi
+else echo "NOT_FOUND: $identifier"; ls -d .hamster/${account}/briefs/*"${slug}"*/ 2>/dev/null | head -5; fi
 ```
 
 If `NOT_FOUND`, do not ask yet. Resolve the supplied brief name against **all synced briefs** in `.hamster/${account}/briefs/*/brief.md`, reading their frontmatter `title` and directory slug:
