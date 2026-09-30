@@ -2,7 +2,7 @@
   "name": "hamster",
   "displayName": "Hamster",
   "version": "3.4.4",
-  "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes. Ask Hamster, plus setup, ship, plan, resume, review, QA, and retro.",
+  "description": "Ask Hamster about your team’s work and turn briefs into shipped code without leaving your AI coding tool.",
   "author": {
     "name": "Hamster",
     "email": "hello@tryhamster.com"
