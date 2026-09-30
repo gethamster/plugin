@@ -1,7 +1,7 @@
 {
   "name": "hamster",
   "version": "3.4.5",
-  "description": "Ask Hamster about your team’s work and turn briefs into shipped code without leaving your AI coding tool.",
+  "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
   "author": {
     "name": "Hamster",
     "email": "hello@tryhamster.com"
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "Ask Hamster and ship briefs",
-    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster’s hosted MCP server. In Codex, build, test, and review code from existing Briefs and Plans, with your approval before pushing or opening a pull request. Coding skills need access to your repository and a shell.",
+    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster's hosted MCP server. In Codex, build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
