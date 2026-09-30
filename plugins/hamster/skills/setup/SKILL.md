@@ -26,11 +26,11 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 ```
 
 - Prints `READY` — the CLI is installed, you are signed in, and `hamster sync` succeeded. Stop.
-If it prints `SETUP_NEEDED` in Codex on macOS and `hamster` is already on `PATH`, the sandbox may be blocking Keychain access. Ask the user to approve re-running only this readiness command outside the sandbox, and tell them why: Hamster keeps its sign-in in the macOS Keychain, which the default workspace sandbox can't read. Run nothing else outside the sandbox. If the user declines, stop and say setup can't be confirmed. If the approved check prints `READY`, stop. Only if it still prints `SETUP_NEEDED`, continue below.
+- Prints `SETUP_NEEDED` — if this is Codex on macOS and `hamster` is already on `PATH`, re-run only this readiness command with elevated permission. The default workspace sandbox cannot read Keychain credentials, and an extra directory grant does not change that. If the elevated check prints `READY`, stop. Only if it still prints `SETUP_NEEDED`, continue below.
 
 ## Install the CLI
 
-If `hamster` is not on PATH (also look in `~/.hamster/bin`), ask the user before installing anything: "Setup needs the Hamster CLI. Install it now? This runs `curl -fsSL https://tryhamster.com/cli/install | bash`, which downloads the installer from tryhamster.com, puts `hamster` in `~/.hamster/bin`, and adds that folder to PATH in your shell profile." Run the command below only after the user agrees. If they decline, stop and tell them setup can't continue without the CLI.
+If `hamster` is not on PATH (also look in `~/.hamster/bin`):
 
 ```bash
 curl -fsSL https://tryhamster.com/cli/install | bash
