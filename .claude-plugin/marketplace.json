@@ -11,7 +11,7 @@
     {
       "name": "hamster",
       "description": "Ask Hamster about your team’s work and turn briefs into shipped code without leaving your AI coding tool.",
-      "version": "3.4.4",
+      "version": "3.4.5",
       "source": "./plugins/hamster",
       "category": "workflow",
       "homepage": "https://tryhamster.com",

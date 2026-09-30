@@ -1,6 +1,6 @@
 {
   "name": "hamster",
-  "version": "3.4.4",
+  "version": "3.4.5",
   "description": "Ask Hamster about your team’s work and turn briefs into shipped code without leaving your AI coding tool.",
   "skills": "./plugins/hamster/skills",
   "agents": "./plugins/hamster/agents",
