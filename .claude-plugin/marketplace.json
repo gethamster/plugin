@@ -11,7 +11,7 @@
     {
       "name": "hamster",
       "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes",
-      "version": "3.4.5",
+      "version": "3.4.6",
       "source": "./plugins/hamster",
       "category": "workflow",
       "homepage": "https://tryhamster.com",

@@ -498,7 +498,7 @@ const codexListing = {
   defaultPrompt: { max: 3, chars: 128 },
 };
 
-// Marketplace installs resolve these inside the plugin folder. The skills-only
+// Marketplace installs resolve these inside the plugin folder. The directory
 // zip still copies the same three files once from the root assets/.
 const CODEX_LISTING_IMAGES = {
   composerIcon: "./assets/icon.png",
@@ -510,7 +510,8 @@ const CODEX_LISTING_IMAGE_PATHS = new Set(
 );
 
 function codexError(field, message) {
-  addError(`Codex plugin.json interface.${field} ${message}`);
+  const manifestField = field.startsWith("extensions.") ? field : `interface.${field}`;
+  addError(`Codex plugin.json ${manifestField} ${message}`);
 }
 
 function requireCodexText(field, value, { chars, multiline = false }) {
@@ -595,8 +596,8 @@ async function validateCodexInterface(iface) {
   }
 
   // Exactly the three listing images, at the paths Codex resolves inside the
-  // installed plugin folder. screenshots stay unset: a skills-only upload rejects
-  // them, and any other image path is still a bundled image held for review.
+  // installed plugin folder. screenshots stay unset: the directory allows them
+  // only for an MCP server with a custom UI, and Hamster's has none.
   for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
     if (iface[field] !== expected) {
       codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
@@ -621,7 +622,63 @@ async function validateCodexInterface(iface) {
     }
   }
   if (iface.screenshots !== undefined) {
-    codexError("screenshots", "must not be set; a skills-only bundle excludes screenshots.");
+    codexError("screenshots", "must not be set; the directory allows screenshots only for an MCP server with custom UI.");
+  }
+}
+
+async function validateCodexOpenAIExtension(manifest) {
+  const extension = manifest.extensions?.["com.openai"];
+  if (extension === undefined) return;
+  const root = "extensions.com.openai";
+  if (!extension || typeof extension !== "object" || Array.isArray(extension)) {
+    codexError(root, "must be an object.");
+    return;
+  }
+  if (Object.hasOwn(extension, "interface")) {
+    codexError(`${root}.interface`, "must stay at the manifest root.");
+  }
+  if (extension.onboardingSkill !== undefined) {
+    const skill = extension.onboardingSkill;
+    if (typeof skill !== "string" || !/^\.\/skills\/[^/\\]+\/SKILL\.md$/.test(skill) || skill.includes("..")) {
+      codexError(`${root}.onboardingSkill`, "must point to an existing skills/<name>/SKILL.md.");
+    } else {
+      try {
+        if (!(await fs.stat(path.join(pluginDir, skill))).isFile()) {
+          codexError(`${root}.onboardingSkill`, "must point to an existing skills/<name>/SKILL.md.");
+        }
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+        codexError(`${root}.onboardingSkill`, "must point to an existing skills/<name>/SKILL.md.");
+      }
+    }
+  }
+  const review = extension.review;
+  for (const key of ["test_credentials", "reviewer_instructions"]) {
+    if (review && Object.hasOwn(review, key)) {
+      codexError(`${root}.review.${key}`, "must not be included.");
+    }
+  }
+  for (const [kind, count] of [["positive", 5], ["negative", 3]]) {
+    const cases = review?.test_cases?.[kind];
+    const field = `${root}.review.test_cases.${kind}`;
+    if (!Array.isArray(cases) || cases.length !== count) {
+      codexError(field, `must have exactly ${count} entries.`);
+    }
+    if (!Array.isArray(cases)) continue;
+    const required = kind === "positive"
+      ? ["description", "prompt", "tools_triggered", "expected_behavior"]
+      : ["description", "prompt"];
+    for (const [index, testCase] of cases.entries()) {
+      for (const key of required) {
+        if (typeof testCase?.[key] !== "string" || !testCase[key].trim()) {
+          codexError(`${field}[${index}].${key}`, "must be a non-empty string.");
+        }
+      }
+    }
+  }
+  const notes = extension.publication?.release_notes;
+  if (notes !== undefined && (typeof notes !== "string" || !notes.trim())) {
+    codexError(`${root}.publication.release_notes`, "must be a non-empty string.");
   }
 }
 
@@ -644,6 +701,7 @@ async function validateCodex(version) {
   }
 
   await validateCodexInterface(manifest.interface);
+  await validateCodexOpenAIExtension(manifest);
 
   if (manifest.license !== "MIT") {
     addError('Codex plugin.json "license" must be "MIT".');
@@ -696,9 +754,7 @@ async function validateMcpFiles() {
 }
 
 // The four plugin manifests are hand-maintained copies of one package summary.
-// The Codex copy also ships inside the skills-only bundle, so the summary must
-// read true for an install with no MCP connector, and binding the four means
-// that wording cannot be re-synced away by hand.
+// Binding them means a wording fix in one cannot be re-synced away by hand.
 async function validateDescriptionParity() {
   const descriptions = new Map();
   for (const file of ["plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json", ".codex-plugin/plugin.json"]) {
