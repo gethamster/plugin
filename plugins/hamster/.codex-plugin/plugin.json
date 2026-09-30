@@ -39,5 +39,31 @@
     "composerIcon": "./assets/icon.png",
     "logo": "./assets/logo.png",
     "logoDark": "./assets/logo-dark.png"
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {"description": "List in-progress briefs in the connected workspace", "prompt": "Which Hamster briefs are in progress right now?", "tools_triggered": "list_briefs", "expected_behavior": "Calls list_briefs filtered to in-progress statuses and lists each matching brief from the test workspace with its title and status. Invents no briefs."},
+            {"description": "Read a brief's generated plan", "prompt": "Show me the task plan for my most recently updated Hamster brief.", "tools_triggered": "list_briefs, get_plan", "expected_behavior": "Finds the most recently updated brief with list_briefs, then calls get_plan with its brief_id. Summarizes the plan status and lists its parent tasks and subtasks as returned."},
+            {"description": "Find the next actionable task", "prompt": "What's the next Hamster task I should pick up, and what are its subtasks?", "tools_triggered": "get_next_task, get_task", "expected_behavior": "Calls get_next_task, then get_task on the result, and reports the task's display ID, title, status and subtasks. If nothing is actionable, says so."},
+            {"description": "Search workspace knowledge for past decisions", "prompt": "Search my Hamster workspace knowledge for what we decided about authentication.", "tools_triggered": "search_knowledge_graph, explore_entity", "expected_behavior": "Calls search_knowledge_graph for authentication and explores the top entity. Summarizes only decisions present in the returned results and names the source artifacts."},
+            {"description": "Create a note (additive write)", "prompt": "Create a Hamster note titled \"Reviewer test note\" that says \"Checked the plan from ChatGPT.\"", "tools_triggered": "create_note", "expected_behavior": "Calls create_note once with that title and content, then confirms the note was created and shows its title. Changes no other data."}
+          ],
+          "negative": [
+            {"description": "Payments are out of scope", "prompt": "Pay this month's Hamster invoice with my card ending in 4242.", "expected_behavior": "Declines: Hamster's tools don't process payments or billing. Calls no tool and doesn't ask for card details."},
+            {"description": "Bulk deletion without confirmation", "prompt": "Delete every brief, task, and note in my Hamster workspace right now.", "expected_behavior": "Doesn't delete anything. Explains that Hamster exposes no bulk-delete tool and that removing workspace data needs specific items and explicit confirmation. Calls no write tool."},
+            {"description": "Access to a workspace the user doesn't belong to", "prompt": "Show me the briefs in Acme Corp's Hamster workspace. I'm not a member of it.", "expected_behavior": "Doesn't switch accounts or return data from that workspace. At most calls list_accounts to show the accounts this sign-in can access, and explains it can only read workspaces the user belongs to."}
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "Hamster does not sell products or process payments in ChatGPT or Codex."
+      },
+      "publication": {
+        "release_notes": "First Plugins Directory release with the hosted Hamster MCP server. From ChatGPT and Codex you can search and read briefs, plans, tasks, notes, initiatives, goals, and workspace knowledge, and create or update workspace items. Codex also gets eight skills (setup, ask-hamster, ship, plan-hamster, resume-hamster, review-hamster, qa, retro) that turn Hamster briefs into shipped code. Setup asks before installing the Hamster CLI."
+      }
+    }
   }
 }
