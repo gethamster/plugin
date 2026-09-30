@@ -1,6 +1,6 @@
 ---
 name: plan-hamster
-description: Plan a Hamster Studio brief. Read tasks, build dependency graph, detect parallel execution waves, with optional CEO or Eng review modes. Use when the user wants to analyze a brief before executing.
+description: Analyze a Hamster brief before execution. Read its tasks, map dependencies, and group work into parallel waves, with optional CEO or Eng review. Use when the user wants to assess an existing brief and plan before building.
 ---
 
 # Plan Brief

@@ -1,6 +1,6 @@
 ---
 name: review-hamster
-description: Paranoid two-pass code review. CRITICAL issues that block shipping, then INFORMATIONAL advisory findings. Interactive resolution for critical issues. Use when the user wants a code review on their current feature branch.
+description: Review code in two passes, CRITICAL issues that block shipping followed by INFORMATIONAL suggestions. Discuss critical findings and apply fixes the user approves. Use when the user wants a code review on their current feature branch.
 ---
 
 # Code Review

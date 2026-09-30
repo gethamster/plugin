@@ -12,7 +12,7 @@
     {
       "name": "hamster",
       "source": "./plugins/hamster",
-      "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes"
+      "description": "Ask Hamster about your team’s work and turn briefs into shipped code without leaving your AI coding tool."
     }
   ]
 }
