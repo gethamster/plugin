@@ -20,19 +20,19 @@
   ],
   "interface": {
     "displayName": "Hamster",
-    "shortDescription": "The spec layer for Codex",
-    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. Ask Hamster reads briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context over the Hamster CLI, and over the hosted Hamster MCP server at https://tryhamster.com/mcp in clients that have those tools.",
+    "shortDescription": "The spec layer for AI agents",
+    "longDescription": "Hamster is an AI-native product planning workspace where humans and AI teammates share context, align on briefs, and ship together. Write briefs that decompose into spec-driven tasks Codex can execute asynchronously, producing review-ready PRs. The Hamster CLI syncs briefs, tasks, and plans into .hamster/ as markdown files in real time. The plugin supplies Ask and Ship, plus setup, plan-hamster, resume-hamster, review-hamster, qa, and retro. Ask Hamster reads briefs, tasks, plans, documents, notes, initiatives, goals, members, and knowledge-graph context over the Hamster CLI, and over the hosted Hamster MCP server at https://tryhamster.com/mcp in clients that have those tools. In ChatGPT, Hamster works through the hosted MCP server; the setup, ship, plan, resume, review, QA, and retro skills need Codex, because they run the Hamster CLI and git in your repository.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
     "websiteURL": "https://tryhamster.com",
-    "supportURL": "https://tryhamster.com/docs",
+    "supportURL": "https://tryhamster.com/support",
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
     "defaultPrompt": [
       "Set up Hamster in this repository with $hamster:setup",
       "I'm changing auth middleware on this branch. Which workspace decisions apply?",
-      "List actionable Briefs from the local projection and ship one"
+      "Which Hamster briefs are in progress, and what's blocking them?"
     ],
     "brandColor": "#141414",
     "brandColorDark": "#fafaf9",
