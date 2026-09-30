@@ -309,6 +309,40 @@ test("a dropped Codex support link fails validation", async () => {
   assert.match(result.stderr, /interface\.supportURL must be a non-empty string/);
 });
 
+test("a fourth Codex negative review case fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-review-count-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    const cases = manifest.extensions["com.openai"].review.test_cases.negative;
+    cases.push({ ...cases[0] });
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /review\.test_cases\.negative must have exactly 3 entries/);
+});
+
+test("Codex reviewer credentials in the manifest fail validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-review-credentials-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.extensions["com.openai"].review.test_credentials = "secret";
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /review\.test_credentials must not be included/);
+});
+
+test("a missing Codex onboarding skill fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-onboarding-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.extensions["com.openai"].onboardingSkill = "./skills/missing/SKILL.md";
+  });
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /onboardingSkill must point to an existing skills\/<name>\/SKILL\.md/);
+});
+
 test("a Codex catalog category that drifts from the manifest fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-catalog-");
   await copyPackage(cwd);
@@ -505,6 +539,7 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   assert.equal(manifestDump.code, 0, manifestDump.stderr);
   const manifest = JSON.parse(manifestDump.stdout);
   assert.equal(manifest.mcpServers, "./.mcp.json");
+  assert.equal(manifest.extensions["com.openai"].review.test_cases.positive.length, 5);
   assert.equal(Object.hasOwn(manifest, "apps"), false);
   const mcpDump = await run("unzip", ["-p", zipPath, ".mcp.json"]);
   assert.equal(mcpDump.code, 0, mcpDump.stderr);
