@@ -30,7 +30,7 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 
 ## Install the CLI
 
-If `hamster` is not on PATH (also look in `~/.hamster/bin`):
+If `hamster` is not on PATH (also look in `~/.hamster/bin`), ask the user before installing anything: "Setup needs the Hamster CLI. Install it now? This runs `curl -fsSL https://tryhamster.com/cli/install | bash`, which downloads the installer from tryhamster.com, puts `hamster` in `~/.hamster/bin`, and adds that folder to PATH in your shell profile." Run the command below only after the user agrees. If they decline, stop and tell them setup can't continue without the CLI.
 
 ```bash
 curl -fsSL https://tryhamster.com/cli/install | bash
