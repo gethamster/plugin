@@ -42,7 +42,7 @@ You can also launch `codex`, run `/plugins`, and install `hamster@hamster-plugin
 
 The Hamster listing in OpenAI's Plugins Directory, used by Codex and ChatGPT, is a zip of this same plugin produced by `node scripts/build-codex-bundle.mjs`: the Codex manifest, the hosted MCP connector in `.mcp.json`, the skills, and the listing images. CI builds it on every push and uploads it as a workflow artifact, and the artifact download is the zip to upload to the directory.
 
-One file differs. The zip replaces setup's install step, `skills/setup/references/install-cli.md`, with `codex-directory/install-cli.md`: when the CLI is missing, setup asks you to install it yourself from [CLI binary](#advanced-cli-binary) instead of running the installer, then signs you in and syncs as usual.
+One section differs. The zip replaces the "Install the CLI" section of `skills/setup/SKILL.md` with `codex-directory/install-cli.md`: when the CLI is missing, setup asks you to install it yourself from [CLI binary](#advanced-cli-binary) instead of running the installer, then signs you in and syncs as usual.
 
 Hamster connects to your workspace through the hosted MCP server. Coding skills require access to your repository and a shell.
 

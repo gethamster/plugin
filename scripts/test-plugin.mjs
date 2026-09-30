@@ -574,6 +574,17 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   }
   assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
   assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
+
+  // setup's install section is the directory's; every other section is intact.
+  const setupDump = await run("unzip", ["-p", zipPath, "skills/setup/SKILL.md"]);
+  assert.equal(setupDump.code, 0, setupDump.stderr);
+  const sourceSections = (await readFile(plugin(cwd, "skills", "setup", "SKILL.md"), "utf8")).split(/\n(?=## )/);
+  const bundledSections = setupDump.stdout.split(/\n(?=## )/);
+  const directorySection = await readFile(path.join(cwd, "codex-directory", "install-cli.md"), "utf8");
+  assert.deepEqual(
+    bundledSections,
+    sourceSections.map((section) => (section.startsWith("## Install the CLI\n") ? directorySection : section))
+  );
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
@@ -613,23 +624,19 @@ test("an uncommitted bundle source stops the build", async () => {
   assert.equal(await pathExists(zipPath), false);
 });
 
-test("a setup skill that inlines its install step again stops the Codex bundle build", async () => {
-  const cwd = await makeTemp("hamster-plugin-bundle-install-step-");
+test("a setup skill whose install section is renamed stops the Codex bundle build", async () => {
+  const cwd = await makeTemp("hamster-plugin-bundle-install-section-");
   await copyPackage(cwd);
-  // The directory zip only swaps the reference file, so an installer written
-  // back into SKILL.md would ship to the directory unless the build refuses.
-  const installStep = plugin(cwd, "skills", "setup", "references", "install-cli.md");
+  // Without its heading, the directory's section has nothing to replace and
+  // the agent-run installer would ship to the directory.
   const skillPath = plugin(cwd, "skills", "setup", "SKILL.md");
   const skill = await readFile(skillPath, "utf8");
-  const inlined = skill.replace(/^If `hamster` is not on PATH.*$/m, await readFile(installStep, "utf8"));
-  assert.notEqual(inlined, skill);
-  await writeFile(skillPath, inlined);
-  await unlink(installStep);
+  await writeFile(skillPath, skill.replace("\n## Install the CLI\n", "\n## Get the CLI\n"));
   await commitPackage(cwd);
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /skills\/setup\/references\/install-cli\.md is missing/);
+  assert.match(result.stderr, /must have exactly one "## Install the CLI" section/);
   assert.equal(await pathExists(zipPath), false);
 });
 

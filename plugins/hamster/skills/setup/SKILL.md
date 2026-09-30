@@ -30,7 +30,13 @@ $SkillDir = "<absolute path of the directory containing this SKILL.md>"; if (Tes
 
 ## Install the CLI
 
-If `hamster` is not on PATH (also look in `~/.hamster/bin`), follow [install-cli](references/install-cli.md), then continue here.
+If `hamster` is not on PATH (also look in `~/.hamster/bin`):
+
+```bash
+curl -fsSL https://tryhamster.com/cli/install | bash
+```
+
+Then put `~/.hamster/bin` on PATH for this session.
 
 ## Sign in
 

@@ -14,9 +14,9 @@
  * so the connector ships in the first upload.
  *
  * The directory's skill scan rejects a skill that downloads and runs code from
- * outside the package, so setup's install step is swapped for
- * codex-directory/install-cli.md, where the user installs the CLI themselves.
- * Every other client keeps the agent-run installer.
+ * outside the package, so the staged setup skill's "## Install the CLI" section
+ * is replaced with codex-directory/install-cli.md, where the user installs the
+ * CLI themselves. Every other client keeps the agent-run installer.
  *
  * Usage:
  *   node scripts/build-codex-bundle.mjs                 # dist/
@@ -49,9 +49,11 @@ const EXCLUDED_MANIFEST_KEYS = ["apps", "hooks"];
 const FORBIDDEN_FILENAMES = new Set(["mcp.json", "mcp_config.json", ".app.json", "server.json", "hooks.json"]);
 const MCP_CONFIG = ".mcp.json";
 
-// The directory's copy of setup's install step, staged over the agent-run one.
-const DIRECTORY_INSTALL_STEP = path.join(repoRoot, "codex-directory", "install-cli.md");
-const SETUP_INSTALL_STEP = path.join("skills", "setup", "references", "install-cli.md");
+// The directory's version of one section of setup's SKILL.md, staged in place
+// of the agent-run installer. The file starts with the same heading.
+const DIRECTORY_INSTALL_SECTION = path.join(repoRoot, "codex-directory", "install-cli.md");
+const SETUP_SKILL = path.join("skills", "setup", "SKILL.md");
+const INSTALL_HEADING = "\n## Install the CLI\n";
 
 // zip writes DOS timestamps, which have no timezone and 2-second granularity, so
 // staged files are normalized to a fixed instant and zipped under TZ=UTC. Modes
@@ -145,6 +147,22 @@ async function listSkillNames() {
   return names;
 }
 
+// The section runs from its heading to the next "## " heading. A renamed,
+// repeated, or trailing section fails the build instead of shipping the
+// agent-run installer.
+async function replaceInstallSection(skillPath) {
+  const skill = await fs.readFile(skillPath, "utf8");
+  const start = skill.indexOf(INSTALL_HEADING);
+  const end = skill.indexOf("\n## ", start + INSTALL_HEADING.length);
+  if (start === -1 || skill.indexOf(INSTALL_HEADING, start + 1) !== -1 || end === -1) {
+    throw new Error(
+      `${SETUP_SKILL} must have exactly one "${INSTALL_HEADING.trim()}" section followed by another "## " section.`
+    );
+  }
+  const section = await fs.readFile(DIRECTORY_INSTALL_SECTION, "utf8");
+  await fs.writeFile(skillPath, `${skill.slice(0, start + 1)}${section}${skill.slice(end)}`);
+}
+
 async function stageBundle(stagingDir, skillNames) {
   await fs.rm(stagingDir, { recursive: true, force: true });
   await fs.mkdir(path.join(stagingDir, ".codex-plugin"), { recursive: true });
@@ -165,13 +183,7 @@ async function stageBundle(stagingDir, skillNames) {
       dereference: true,
     });
   }
-  // Overwrite, never add: if setup's install step moves, the build fails rather
-  // than shipping a handoff that setup no longer links to.
-  const installStep = path.join(stagingDir, SETUP_INSTALL_STEP);
-  if (!(await pathExists(installStep))) {
-    throw new Error(`${SETUP_INSTALL_STEP} is missing from the staged skills; setup's install step moved.`);
-  }
-  await fs.cp(DIRECTORY_INSTALL_STEP, installStep);
+  await replaceInstallSection(path.join(stagingDir, SETUP_SKILL));
 
   // One assets/ tree, from the repository root. plugins/hamster/assets/ is the
   // marketplace copy of the three PNGs; copying it too would archive them twice.
