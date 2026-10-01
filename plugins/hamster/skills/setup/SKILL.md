@@ -1,13 +1,13 @@
 ---
 name: setup
-description: Get the Hamster CLI installed, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
+description: Make sure the Hamster CLI is installed, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
 ---
 
 # Setup
 
 Make this workspace ready: Hamster CLI on PATH, user signed in, plan on disk in this repo's `.hamster/`.
 
-Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill is only for getting the CLI installed and the local plan synced.
+Talking to Hamster uses the Hamster MCP tools when the client has them; `hamster chat` is the same ask path over the CLI. This skill is only for setting up the CLI and syncing the local plan.
 
 ## Readiness check
 
