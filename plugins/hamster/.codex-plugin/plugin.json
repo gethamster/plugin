@@ -21,16 +21,16 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "Ask Hamster and ship briefs",
-    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster's hosted MCP server. In Codex, the coding skills build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
+    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention, or have it make changes in your workspace. Connect to your workspace through Hamster's hosted MCP server. In Codex, the coding skills build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
     "websiteURL": "https://tryhamster.com",
-    "supportURL": "https://tryhamster.com/docs",
+    "supportURL": "https://tryhamster.com/docs#get-help",
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
     "defaultPrompt": [
-      "Set up Hamster in this repository with $hamster:setup",
+      "Which Hamster brief is ready to ship next?",
       "I'm changing auth middleware on this branch. Which workspace decisions apply?",
       "Which Hamster briefs are in progress, and what's blocking them?"
     ],
@@ -46,7 +46,7 @@
       "review": {
         "test_cases": {
           "positive": [
-            {"description": "List active briefs in the connected workspace", "prompt": "Which Hamster briefs are active right now?", "tools_triggered": "list_briefs", "expected_behavior": "Calls list_briefs with statuses refining and delivering, paging while has_more is true, and lists each matching brief from the test workspace with its title and status. Invents no briefs."},
+            {"description": "List active briefs in the connected workspace", "prompt": "Which Hamster briefs are active right now?", "tools_triggered": "list_briefs", "expected_behavior": "Calls list_briefs, paging while has_more is true, and lists the active briefs from the test workspace with each brief's title and status as returned. Invents no briefs."},
             {"description": "Read a brief's generated plan", "prompt": "Show me the task plan for my most recently updated Hamster brief.", "tools_triggered": "list_briefs, get_plan", "expected_behavior": "Finds the most recently updated brief with list_briefs, then calls get_plan with its brief_id. Summarizes the plan status and lists its parent tasks with their subtask counts as returned."},
             {"description": "Find the next actionable task", "prompt": "What's the next Hamster task I should pick up, and what are its subtasks?", "tools_triggered": "get_next_task, get_task", "expected_behavior": "Calls get_next_task, then get_task on the result, and reports the task's display ID, title, status and subtasks. If nothing is actionable, says so."},
             {"description": "Search workspace knowledge for past decisions", "prompt": "Search my Hamster workspace knowledge for what we decided about authentication.", "tools_triggered": "search_knowledge_graph, explore_entity", "expected_behavior": "Calls search_knowledge_graph for authentication. If a matching entity is returned, calls explore_entity with its title. Summarizes only decisions present in the returned results and names the source artifacts. If nothing relevant is returned, says so."},
