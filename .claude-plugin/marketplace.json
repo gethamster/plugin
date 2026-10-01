@@ -11,7 +11,7 @@
     {
       "name": "hamster",
       "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
-      "version": "3.4.8",
+      "version": "3.4.9",
       "source": "./plugins/hamster",
       "category": "workflow",
       "homepage": "https://tryhamster.com",
