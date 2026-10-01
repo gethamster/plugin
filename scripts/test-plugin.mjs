@@ -28,6 +28,7 @@ const PACKAGE_ENTRIES = [
   "assets",
   "scripts",
   "codex-directory",
+  "README.md",
 ];
 
 // The folder every client installs, inside a fixture copy.

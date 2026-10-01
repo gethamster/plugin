@@ -54,6 +54,8 @@ const MCP_CONFIG = ".mcp.json";
 const DIRECTORY_INSTALL_SECTION = path.join(repoRoot, "codex-directory", "install-cli.md");
 const SETUP_SKILL = path.join("skills", "setup", "SKILL.md");
 const INSTALL_HEADING = "\n## Install the CLI\n";
+const README_CLI_HEADING = "\n## Advanced: CLI binary\n";
+const README_CLI_ANCHOR = "#advanced-cli-binary";
 
 // zip writes DOS timestamps, which have no timezone and 2-second granularity, so
 // staged files are normalized to a fixed instant and zipped under TZ=UTC. Modes
@@ -162,6 +164,14 @@ async function replaceInstallSection(skillPath) {
   const section = await fs.readFile(DIRECTORY_INSTALL_SECTION, "utf8");
   if (!section.startsWith(INSTALL_HEADING.slice(1))) {
     throw new Error(`${path.relative(repoRoot, DIRECTORY_INSTALL_SECTION)} must start with "${INSTALL_HEADING.trim()}".`);
+  }
+  // The section links the README's CLI binary heading on main. Renaming that
+  // heading would send directory users to the top of the README.
+  const readme = await fs.readFile(path.join(repoRoot, "README.md"), "utf8");
+  if (!section.includes(README_CLI_ANCHOR) || !readme.includes(README_CLI_HEADING)) {
+    throw new Error(
+      `${path.relative(repoRoot, DIRECTORY_INSTALL_SECTION)} links README${README_CLI_ANCHOR}, so README.md must keep its "${README_CLI_HEADING.trim()}" heading.`
+    );
   }
   await fs.writeFile(skillPath, `${skill.slice(0, start + 1)}${section}${skill.slice(end)}`);
 }
