@@ -72,11 +72,9 @@ else echo "NOT_FOUND: $identifier"; ls -d .hamster/${account}/briefs/*"${slug}"*
 
 If `NOT_FOUND`, do not ask yet. Resolve the supplied brief name against **all synced briefs** in `.hamster/${account}/briefs/*/brief.md`, reading their frontmatter `title` and directory slug:
 
-1. Normalize the supplied name and titles by trimming whitespace and trailing punctuation, removing a leading `the ` and a trailing ` brief` (independently), and comparing case-insensitively.
+1. Normalize the supplied name and titles by trimming whitespace and trailing punctuation, removing a leading `the ` and a trailing ` brief` when present, and comparing case-insensitively.
 2. Compare the normalized name with normalized full titles first. If none match, extract each **short title** from its original title before the earliest `:`, ` — `, or ` - ` separator (or use the whole title if there is no separator), normalize that short title, and compare for equality.
 3. At the first tier with matches, select it without asking if exactly one brief matches, remembering its directory slug as `$slug`. If two or more match, ask the user to choose from those candidates; do not use the other tier to break the tie. If neither tier matches, show the closest available titles/slugs and ask. An empty normalized name never resolves automatically. Other than an exact short-title match, never auto-select a title or slug prefix or another partial match.
-
-For example, `the Checkout reliability brief.` uniquely matches the short title of `Checkout reliability: isolate payment retries`, so select it without a question. `the checkout brief` matches neither full nor short title, so ask rather than choosing a partial match.
 
 ### If no argument
 
