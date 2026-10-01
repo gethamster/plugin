@@ -162,15 +162,19 @@ async function replaceInstallSection(skillPath) {
     );
   }
   const section = await fs.readFile(DIRECTORY_INSTALL_SECTION, "utf8");
+  const sectionPath = path.relative(repoRoot, DIRECTORY_INSTALL_SECTION);
   if (!section.startsWith(INSTALL_HEADING.slice(1))) {
-    throw new Error(`${path.relative(repoRoot, DIRECTORY_INSTALL_SECTION)} must start with "${INSTALL_HEADING.trim()}".`);
+    throw new Error(`${sectionPath} must start with "${INSTALL_HEADING.trim()}".`);
   }
   // The section links the README's CLI binary heading on main. Renaming that
   // heading would send directory users to the top of the README.
+  if (!section.includes(README_CLI_ANCHOR)) {
+    throw new Error(`${sectionPath} must link README${README_CLI_ANCHOR}, where the user installs the CLI.`);
+  }
   const readme = await fs.readFile(path.join(repoRoot, "README.md"), "utf8");
-  if (!section.includes(README_CLI_ANCHOR) || !readme.includes(README_CLI_HEADING)) {
+  if (!readme.includes(README_CLI_HEADING)) {
     throw new Error(
-      `${path.relative(repoRoot, DIRECTORY_INSTALL_SECTION)} links README${README_CLI_ANCHOR}, so README.md must keep its "${README_CLI_HEADING.trim()}" heading.`
+      `${sectionPath} links README${README_CLI_ANCHOR}, so README.md must keep its "${README_CLI_HEADING.trim()}" heading.`
     );
   }
   await fs.writeFile(skillPath, `${skill.slice(0, start + 1)}${section}${skill.slice(end)}`);
