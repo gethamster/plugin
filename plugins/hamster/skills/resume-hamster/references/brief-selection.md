@@ -45,7 +45,7 @@ Remember the literal `ACCOUNT_RESOLVED` value as the filesystem `$account`. Each
 
 ### If argument provided
 
-First resolve URL/UUID/slug as before; a `FOUND` result takes precedence over title matching:
+First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matching:
 
 ```bash
 arg="$ARGUMENTS"; arg="${arg%/}"
@@ -76,7 +76,7 @@ If `NOT_FOUND`, do not ask yet. Resolve the supplied brief name against **all sy
 2. Compare the normalized name with normalized full titles first. If none match, extract each **short title** from its original title before the earliest `:`, ` — `, or ` - ` separator (or use the whole title if there is no separator), normalize that short title, and compare for equality.
 3. At the first tier with matches, select it without asking if exactly one brief matches, remembering its directory slug as `$slug`. If two or more match, ask the user to choose from those candidates; do not use the other tier to break the tie. If neither tier matches, show the closest available titles/slugs and ask. An empty normalized name never resolves automatically. Other than an exact short-title match, never auto-select a title or slug prefix or another partial match.
 
-For example, `the Checkout reliability brief.` uniquely matches the short title of `Checkout reliability: isolate payment retries`, so select it without a question. `the checkout brief` matches neither full nor short title, so ask rather than choosing a partial match. This changes brief selection only; keep scheduling confirmations and scope-change questions unchanged.
+For example, `the Checkout reliability brief.` uniquely matches the short title of `Checkout reliability: isolate payment retries`, so select it without a question. `the checkout brief` matches neither full nor short title, so ask rather than choosing a partial match.
 
 ### If no argument
 
