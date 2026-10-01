@@ -575,6 +575,13 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   }
   assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
   assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
+
+  // The directory's setup asks the user to install the CLI; every other section stays.
+  const setupDump = await run("unzip", ["-p", zipPath, "skills/setup/SKILL.md"]);
+  assert.equal(setupDump.code, 0, setupDump.stderr);
+  assert.equal(setupDump.stdout.includes("tryhamster.com/cli/install"), false);
+  const headings = (skill) => skill.split("\n").filter((line) => line.startsWith("## "));
+  assert.deepEqual(headings(setupDump.stdout), headings(await readFile(plugin(cwd, "skills", "setup", "SKILL.md"), "utf8")));
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
