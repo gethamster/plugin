@@ -30,7 +30,7 @@
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
     "defaultPrompt": [
-      "What's the next Hamster task I should pick up?",
+      "Which Hamster brief is ready to ship next?",
       "I'm changing auth middleware on this branch. Which workspace decisions apply?",
       "Which Hamster briefs are in progress, and what's blocking them?"
     ],
