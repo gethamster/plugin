@@ -27,6 +27,8 @@ const PACKAGE_ENTRIES = [
   ".agents",
   "assets",
   "scripts",
+  "codex-directory",
+  "README.md",
 ];
 
 // The folder every client installs, inside a fixture copy.
@@ -573,6 +575,13 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   }
   assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
   assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
+
+  // The directory's setup asks the user to install the CLI; every other section stays.
+  const setupDump = await run("unzip", ["-p", zipPath, "skills/setup/SKILL.md"]);
+  assert.equal(setupDump.code, 0, setupDump.stderr);
+  assert.equal(setupDump.stdout.includes("tryhamster.com/cli/install"), false);
+  const headings = (skill) => skill.split("\n").filter((line) => line.startsWith("## "));
+  assert.deepEqual(headings(setupDump.stdout), headings(await readFile(plugin(cwd, "skills", "setup", "SKILL.md"), "utf8")));
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
@@ -609,6 +618,21 @@ test("an uncommitted bundle source stops the build", async () => {
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Commit or stash your changes first/);
   assert.match(result.stderr, /plugins\/hamster\/skills\/ship\/SKILL\.md/);
+  assert.equal(await pathExists(zipPath), false);
+});
+
+test("a setup skill whose install section is renamed stops the Codex bundle build", async () => {
+  const cwd = await makeTemp("hamster-plugin-bundle-install-section-");
+  await copyPackage(cwd);
+  // Without its heading, the directory's section has nothing to replace and
+  // the agent-run installer would ship to the directory.
+  const skillPath = plugin(cwd, "skills", "setup", "SKILL.md");
+  const skill = await readFile(skillPath, "utf8");
+  await writeFile(skillPath, skill.replace("\n## Install the CLI\n", "\n## Get the CLI\n"));
+  await commitPackage(cwd);
+
+  const { result, zipPath } = await buildCodexBundle(cwd);
+  assert.notEqual(result.code, 0);
   assert.equal(await pathExists(zipPath), false);
 });
 

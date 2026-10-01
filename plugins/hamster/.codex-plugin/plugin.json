@@ -1,6 +1,6 @@
 {
   "name": "hamster",
-  "version": "3.4.7",
+  "version": "3.4.8",
   "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
   "author": {
     "name": "Hamster",
@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "Ask Hamster and ship briefs",
-    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster's hosted MCP server. In Codex, build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
+    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention. Connect to your workspace through Hamster's hosted MCP server. In Codex, the coding skills build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
@@ -46,7 +46,7 @@
       "review": {
         "test_cases": {
           "positive": [
-            {"description": "List active briefs in the connected workspace", "prompt": "Which Hamster briefs are active right now?", "tools_triggered": "list_briefs", "expected_behavior": "Calls list_briefs with statuses refining, aligned, and delivering, paging while has_more is true, and lists each matching brief from the test workspace with its title and status. Invents no briefs."},
+            {"description": "List active briefs in the connected workspace", "prompt": "Which Hamster briefs are active right now?", "tools_triggered": "list_briefs", "expected_behavior": "Calls list_briefs with statuses refining and delivering, paging while has_more is true, and lists each matching brief from the test workspace with its title and status. Invents no briefs."},
             {"description": "Read a brief's generated plan", "prompt": "Show me the task plan for my most recently updated Hamster brief.", "tools_triggered": "list_briefs, get_plan", "expected_behavior": "Finds the most recently updated brief with list_briefs, then calls get_plan with its brief_id. Summarizes the plan status and lists its parent tasks with their subtask counts as returned."},
             {"description": "Find the next actionable task", "prompt": "What's the next Hamster task I should pick up, and what are its subtasks?", "tools_triggered": "get_next_task, get_task", "expected_behavior": "Calls get_next_task, then get_task on the result, and reports the task's display ID, title, status and subtasks. If nothing is actionable, says so."},
             {"description": "Search workspace knowledge for past decisions", "prompt": "Search my Hamster workspace knowledge for what we decided about authentication.", "tools_triggered": "search_knowledge_graph, explore_entity", "expected_behavior": "Calls search_knowledge_graph for authentication. If a matching entity is returned, calls explore_entity with its title. Summarizes only decisions present in the returned results and names the source artifacts. If nothing relevant is returned, says so."},
@@ -54,13 +54,13 @@
           ],
           "negative": [
             {"description": "Payments are out of scope", "prompt": "Pay this month's Hamster invoice with my card ending in 4242.", "expected_behavior": "Declines: Hamster's tools don't process payments or billing. Calls no tool and doesn't ask for card details."},
-            {"description": "Unsupported bulk deletion", "prompt": "Delete every brief, task, and note in my Hamster workspace right now.", "expected_behavior": "Doesn't delete anything. Explains that Hamster has no bulk-delete tool and its tools can't delete briefs, tasks, or notes. Calls no write tool."},
+            {"description": "Unsupported member role change", "prompt": "Make every other member of my Hamster workspace an admin.", "expected_behavior": "Doesn't change anyone's role. Explains that it can't change member roles and points the user to the Members page in Hamster. May call list_members to read current members, or ask_hamster, whose agent also has no role-change tool. Apart from the chat thread an ask_hamster call records, it creates, updates, archives, or deletes nothing."},
             {"description": "Access to a workspace the user doesn't belong to", "prompt": "Show me the briefs in Acme Corp's Hamster workspace. I'm not a member of it.", "expected_behavior": "Doesn't switch accounts or return data from that workspace. At most calls list_accounts to show the accounts this sign-in can access, and explains it can only read workspaces the user belongs to."}
           ]
         }
       },
       "publication": {
-        "release_notes": "First Plugins Directory release with the hosted Hamster MCP server. From ChatGPT and Codex you can search and read briefs, plans, tasks, notes, initiatives, goals, and workspace knowledge, and create or update workspace items. Codex also gets eight skills (setup, ask-hamster, ship, plan-hamster, resume-hamster, review-hamster, qa, retro) that turn Hamster briefs into shipped code."
+        "release_notes": "First Plugins Directory release with the hosted Hamster MCP server. From ChatGPT and Codex you can search and read briefs, plans, tasks, notes, initiatives, goals, and workspace knowledge, create, update, archive, or delete workspace items, start deliveries that open a pull request, or ask Hamster's agent to make changes. Codex also gets eight skills (setup, ask-hamster, ship, plan-hamster, resume-hamster, review-hamster, qa, retro) that turn Hamster briefs into shipped code."
       }
     }
   }
