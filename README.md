@@ -266,7 +266,7 @@ Post-wave (orchestrator):
 
 ## Advanced: CLI binary
 
-Use this when you want the `hamster` binary without a plugin client, or when setup from the Plugins Directory asks you to install it yourself.
+Use this when you want the `hamster` binary without a plugin client. If setup from the Plugins Directory sent you here, run only the install line (or download a binary below), then go back to setup; it signs you in and syncs.
 
 ```bash
 curl -fsSL https://tryhamster.com/cli/install | bash
