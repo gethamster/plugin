@@ -160,6 +160,9 @@ async function replaceInstallSection(skillPath) {
     );
   }
   const section = await fs.readFile(DIRECTORY_INSTALL_SECTION, "utf8");
+  if (!section.startsWith(INSTALL_HEADING.slice(1))) {
+    throw new Error(`${path.relative(repoRoot, DIRECTORY_INSTALL_SECTION)} must start with "${INSTALL_HEADING.trim()}".`);
+  }
   await fs.writeFile(skillPath, `${skill.slice(0, start + 1)}${section}${skill.slice(end)}`);
 }
 
