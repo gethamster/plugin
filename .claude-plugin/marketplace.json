@@ -10,8 +10,8 @@
   "plugins": [
     {
       "name": "hamster",
-      "description": "Orchestrates Hamster Studio brief execution with team personas, parallel wave execution, and deep review modes",
-      "version": "3.4.4",
+      "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
+      "version": "3.4.8",
       "source": "./plugins/hamster",
       "category": "workflow",
       "homepage": "https://tryhamster.com",

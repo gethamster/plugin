@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Install the Hamster CLI, sign in, and sync the plan into this repo. Use when the user says Install Hamster, first-run setup, or when ship/plan-hamster/resume-hamster report SETUP_NEEDED.
+description: Install the Hamster CLI if missing, sign in, and sync the plan into this repo. Use when the user says Install Hamster, requests first-run setup, or when ship, plan-hamster, or resume-hamster reports SETUP_NEEDED.
 ---
 
 # Setup
@@ -68,6 +68,6 @@ When the check prints `READY`, confirm this repo now has `.hamster/`. If the cli
 - Antigravity: in the CLI, open `/mcp`, select `hamster_hamster`, then Authenticate; in the app, select Authenticate on `hamster_hamster` under Settings → Customizations → Installed MCP Servers.
 - Pi has no MCP; Hamster runs through the CLI.
 
-If the client has no Hamster MCP server, as in a skills-only install from Codex's Plugins Directory, `ask-hamster` still works through the CLI. To add the Hamster tools, tell the user to add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth; in Codex that is `codex mcp add hamster --url https://tryhamster.com/mcp`, then `codex mcp login hamster`.
+If the client has no Hamster MCP server, `ask-hamster` still works through the CLI. To add the Hamster tools, tell the user to add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth; in Codex that is `codex mcp add hamster --url https://tryhamster.com/mcp`, then `codex mcp login hamster`.
 
 Then tell the user they can ask Hamster about this repo with the `ask-hamster` skill and ship a brief with `ship`.

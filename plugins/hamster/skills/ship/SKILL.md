@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Ship a Hamster Studio brief. Merge base, implement in parallel waves, test, review, create bisectable commits, and optionally PR. Use when the user wants to execute or ship a brief.
+description: Ship a Hamster brief. Merge the base branch, implement in parallel waves, test, review, and create bisectable commits. Ask before opening a PR. Use when the user wants to execute or ship an existing brief.
 ---
 
 # Ship Brief
@@ -105,7 +105,7 @@ Read [execution-loop](references/execution-loop.md) and follow it for every wave
 | Test gate fails | Stop, report, ask fix or skip |
 | NEEDS_FIXES after 2 rounds | Report to user, ask skip or manual fix |
 | Worker fails | Report, ask retry or skip |
-| Executor returns PLAN_ISSUE | Verify, then: local fix → corrected re-launch; scope change → ask user |
+| Executor returns PLAN_ISSUE | Verify: resolved authority-correct work → review; unresolved local fix → corrected re-launch; scope beyond authority or unresolved decision → ask user |
 | Task already done | Skip it |
 
 ## Notes

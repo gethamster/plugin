@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Systematic QA with diff-aware, full suite, quick smoke, or regression testing modes. Issue taxonomy and optional fix loop. Use when the user wants to run tests or check quality on their changes.
+description: Run QA in diff-aware, full-suite, quick-smoke, or regression mode. Report failures by category and severity, with optional fixes. Use when the user wants to run tests or check quality on their changes.
 ---
 
 # QA
