@@ -112,9 +112,9 @@ Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Bu
 |-------|---------|-------------|
 | `/hamster:setup` | — | Install the CLI, sign in, and sync the plan into this repo |
 | `/hamster:ask-hamster [request]` | Workspace Copilot | Connect current code with workspace priorities, blockers, blueprints, or related work (hosted MCP when the client has it; `hamster chat` otherwise) |
-| `/hamster:ship [slug-or-url]` | Release Engineer | Ship a brief: merge base, implement in parallel, test, review, bisectable commits, PR |
-| `/hamster:plan-hamster [slug-or-url]` | Tech Lead + CEO/Eng modes | Analyze brief with optional founder or architecture review |
-| `/hamster:resume-hamster [slug]` | — | Resume interrupted execution from where you left off |
+| `/hamster:ship [brief]` | Release Engineer | Ship a brief: merge base, implement in parallel, test, review, bisectable commits, PR |
+| `/hamster:plan-hamster [brief]` | Tech Lead + CEO/Eng modes | Analyze brief with optional founder or architecture review |
+| `/hamster:resume-hamster [brief]` | — | Resume interrupted execution from where you left off |
 | `/hamster:review-hamster` | Staff Engineer | Paranoid two-pass code review (CRITICAL then INFORMATIONAL) |
 | `/hamster:qa [mode]` | QA Lead | Systematic testing: diff-aware, full, quick, regression |
 | `/hamster:retro [days]` | Eng Manager | Engineering retrospective with metrics, trends, team analysis |
@@ -138,10 +138,11 @@ Follow-up questions continue the same Hamster conversation when they depend on t
 
 #### `/hamster:ship`
 
-The main orchestrator. Accepts a brief slug, UUID, or Hamster Studio URL:
+The main orchestrator. Ship, plan-hamster, and resume-hamster share brief selection: a slug, UUID, or Hamster Studio URL takes precedence, followed by an exact title or short title (the part before a subtitle separator). Names ignore case, a leading “the”, a trailing “brief”, and trailing punctuation. A unique match proceeds without a selection question; ambiguous or partial-only names require clarification.
 
 ```
 /hamster:ship user-authentication
+/hamster:ship the Checkout reliability brief.
 /hamster:ship https://tryhamster.com/home/hamster/briefs/2de8d546-50ab-4dbd-a678-579ec8119f60
 ```
 

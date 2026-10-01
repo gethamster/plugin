@@ -1,6 +1,6 @@
 # Account Resolution, Brief Selection, and Scheduling
 
-Canonical source: `skills/ship/references/brief-selection.md`. It is copied byte-for-byte into plan-hamster and resume-hamster because every skill directory is self-contained; `scripts/validate-plugin.mjs` rejects divergent copies. Edit the canonical file and copy it to both consumers. All three skills run Account Resolution before their own setup; plan runs Brief Selection and Scheduling, while resume re-enters Scheduling.
+Canonical source: `skills/ship/references/brief-selection.md`. It is copied byte-for-byte into plan-hamster and resume-hamster because every skill directory is self-contained; `scripts/validate-plugin.mjs` rejects divergent copies. Edit the canonical file and copy it to both consumers. All three skills run Account Resolution before their own setup; plan runs Brief Selection and Scheduling, while resume uses Brief Selection for an explicit argument and re-enters Scheduling.
 
 ## Account Resolution
 
@@ -45,7 +45,7 @@ Remember the literal `ACCOUNT_RESOLVED` value as the filesystem `$account`. Each
 
 ### If argument provided
 
-Extract a slug from URL/UUID/slug and verify in one call:
+First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matching:
 
 ```bash
 arg="$ARGUMENTS"; arg="${arg%/}"
@@ -67,10 +67,14 @@ if echo "$identifier" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
   done
 else slug="$identifier"; fi
 if [ -f ".hamster/${account}/briefs/${slug}/brief.md" ]; then echo "FOUND: $slug"
-else echo "NOT_FOUND: $identifier"; ls -d .hamster/${account}/briefs/*${slug}*/ 2>/dev/null | head -5; fi
+else echo "NOT_FOUND: $identifier"; ls -d .hamster/${account}/briefs/*"${slug}"*/ 2>/dev/null | head -5; fi
 ```
 
-If `NOT_FOUND`, suggest the partial matches shown.
+If `NOT_FOUND`, do not ask yet. Resolve the supplied brief name against **all synced briefs** in `.hamster/${account}/briefs/*/brief.md`, reading their frontmatter `title` and directory slug:
+
+1. Normalize the supplied name and titles by trimming whitespace and trailing punctuation, removing a leading `the ` and a trailing ` brief` when present, and comparing case-insensitively.
+2. Compare the normalized name with normalized full titles first. If none match, extract each **short title** from its original title before the earliest `:`, ` — `, or ` - ` separator (or use the whole title if there is no separator), normalize that short title, and compare for equality.
+3. At the first tier with matches, select it without asking if exactly one brief matches, remembering its directory slug as `$slug`. If two or more match, ask the user to choose from those candidates; do not use the other tier to break the tie. If neither tier matches, show the closest available titles/slugs and ask. An empty normalized name never resolves automatically. Other than an exact short-title match, never auto-select a title or slug prefix or another partial match.
 
 ### If no argument
 
