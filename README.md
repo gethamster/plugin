@@ -127,11 +127,11 @@ The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is i
 
 #### `/hamster:ask-hamster`
 
-The direct gateway to Hamster's connected workspace context. Uses the Hamster MCP tools when the client has them; otherwise `hamster chat` is the same ask path over the CLI. Explicit requests can also perform supported workspace actions:
+The gateway for open-ended questions about Hamster's connected workspace context, such as how the code you're changing relates to priorities, blueprints, or decisions. Uses the Hamster MCP tools when the client has them; otherwise `hamster chat` is the same ask path over the CLI. Direct lookups and edits (listing briefs, reading plans and tasks, searching knowledge, creating notes or briefs) go to the named Hamster MCP tools instead. For example:
 
 ```
 /hamster:ask-hamster I'm modifying auth middleware in apps/web/app/api/. What does our blueprint say about third-party integrations?
-/hamster:ask-hamster I prototyped rate limiting in apps/api/middleware/rate-limit.ts. Create a brief for this work.
+/hamster:ask-hamster I prototyped rate limiting in apps/api/middleware/rate-limit.ts. Which brief or initiative should this work belong to?
 ```
 
 Follow-up questions continue the same Hamster conversation when they depend on the previous response.
