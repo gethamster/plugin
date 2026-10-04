@@ -18,7 +18,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 | Skill | What it does |
 |-------|--------------|
 | `/hamster:setup` | Installs the Hamster CLI if it is missing, signs you in, and syncs the plan into this repository's `.hamster/` folder |
-| `/hamster:ask-hamster` | Answers questions about your workspace's briefs, tasks, plans, and decisions, and performs workspace actions you ask for |
+| `/hamster:ask-hamster` | Answers open-ended questions about your workspace, such as how your current work relates to its priorities, blockers, and decisions. Direct lookups and edits go to the named Hamster tools |
 | `/hamster:ship` | Executes a brief: branches, implements its tasks in parallel waves, validates, reviews, and commits. Opens a pull request only when you ask |
 | `/hamster:plan-hamster` | Read-only analysis of a brief, with optional founder or architecture review |
 | `/hamster:resume-hamster` | Resumes an interrupted `ship` run |
