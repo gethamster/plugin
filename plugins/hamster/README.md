@@ -18,7 +18,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 | Skill | What it does |
 |-------|--------------|
 | `/hamster:setup` | Installs the Hamster CLI if it is missing, signs you in, and syncs the plan into this repository's `.hamster/` folder |
-| `/hamster:ask-hamster` | Answers open-ended questions about your workspace, such as how your current work relates to its priorities, blockers, and decisions. Direct lookups and edits go to the named Hamster tools |
+| `/hamster:ask-hamster` | Answers open-ended questions about your workspace, such as how your current work relates to its priorities, blockers, and decisions. Direct lookups and edits go to the named Hamster MCP tools |
 | `/hamster:ship` | Executes a brief: branches, implements its tasks in parallel waves, validates, reviews, and commits. Opens a pull request only when you ask |
 | `/hamster:plan-hamster` | Read-only analysis of a brief, with optional founder or architecture review |
 | `/hamster:resume-hamster` | Resumes an interrupted `ship` run |
@@ -31,7 +31,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 Run `/hamster:setup` first. These prompts work against any Hamster workspace that has at least one brief with tasks.
 
 1. **Set up the repository.** `/hamster:setup` installs the Hamster CLI if it is missing, opens your browser to sign in, and syncs your workspace's briefs and tasks into `.hamster/`. It finishes when the readiness check prints `READY`.
-2. **Ask about your workspace.** `/hamster:ask-hamster Which briefs are in progress in this workspace, and what is blocking them?` Hamster answers from your workspace's briefs, tasks, and initiatives, with links back to Hamster Studio.
+2. **Ask about your workspace.** `/hamster:ask-hamster What's blocking the briefs in progress in this workspace, and which should I pick up first?` Hamster answers from your workspace's briefs, tasks, and initiatives, with links back to Hamster Studio.
 3. **Plan a brief before building it.** `/hamster:plan-hamster` lists the briefs synced into `.hamster/`. Pick one, and it shows the brief's tasks as a dependency graph grouped into parallel waves. It changes no code and no task status.
 4. **Ship a brief.** `/hamster:ship <brief URL or slug>` shows the same wave plan and waits for you to confirm. It then creates a branch, implements each wave, runs your project's checks, reviews the changes, and commits. It pushes or opens a pull request only if you ask.
 5. **Review your branch.** `/hamster:review-hamster` reviews the current branch against the default branch. It reports issues that block shipping first, then advisory findings.
