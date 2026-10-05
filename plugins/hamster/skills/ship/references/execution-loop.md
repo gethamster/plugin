@@ -103,7 +103,7 @@ If the final formatter pass leaves a diff (e.g. from post-review edits), commit 
 
 **PR feedback aggregation is mandatory**: collect every executor's deviations and PLAN_ISSUEs across all waves, including earlier completed tasks on resume. Retain prior task completion and feedback resolutions from available reports and any existing PR body; merge new entries by task and issue, updating their resolution without erasing their history. Do not replace prior feedback with `None reported.` merely because this resumed wave has none. Only mark completed tasks checked; keep unresolved or unbuilt work explicit.
 
-**PR** — First check whether this branch already has a PR (`gh pr view --json url,body`). If it does, push the completed commits and update its body with `gh pr edit --body` using the merged task status and Plan Feedback above; preserve the other existing body content and report its URL. A push alone does not update PR feedback. Only an explicit no-PR result establishes absence. On auth, network, or other lookup errors, skip the PR step: don't treat the PR as absent, don't ask to create one, and don't create or edit a PR. Keep the error for the final report and continue to the brief status update. If no PR exists, ask the user ("Create a PR?" yes/later). Only if yes, inline (no agent):
+**PR** — First check whether this branch already has a PR (`gh pr view --json url,body`). Only an explicit no-PR result establishes absence; on auth, network, or other lookup errors, report and stop instead of treating the PR as absent or asking to create one. If it does, push the completed commits and update its body with `gh pr edit --body` using the merged task status and Plan Feedback above; preserve the other existing body content and report its URL. A push alone does not update PR feedback. If no PR exists, ask the user ("Create a PR?" yes/later). Only if yes, inline (no agent):
 
 ```bash
 git push -u origin HEAD
@@ -141,7 +141,7 @@ hamster brief status ${slug} delivering
 
 ```
 Brief shipped: {title}
-  Branch: {branch} | PR: {url, skipped, or "lookup failed: {error}"}
+  Branch: {branch} | PR: {url or skipped}
   Tasks: {n}/{total} | Waves: {n} | Commits: {n}
   Plan feedback: {n deviations, n plan issues — or "none"}
 ```
