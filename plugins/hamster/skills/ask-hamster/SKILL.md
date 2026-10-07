@@ -1,6 +1,6 @@
 ---
 name: ask-hamster
-description: Ask Hamster open-ended questions that need its judgment across the workspace, such as how the current code or editor context relates to priorities, blockers, blueprints, intent, or decisions. Direct reads and writes go to the named Hamster tools instead.
+description: Workspace judgment; reads/writes use named tools; explore_entity on graph hits. Ask Hamster open-ended questions that need its judgment across the workspace. For knowledge searches, explore a matching entity returned before summarizing decisions.
 ---
 
 # Ask Hamster
