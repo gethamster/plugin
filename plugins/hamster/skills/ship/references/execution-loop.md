@@ -145,5 +145,3 @@ Brief shipped: {title}
   Tasks: {n}/{total} | Waves: {n} | Commits: {n}
   Plan feedback: {n deviations, n plan issues — or "none"}
 ```
-
-If the PR lookup failed, write `PR: lookup failed: {error}` in that report, not `PR: skipped` or `PR: skipped (lookup failed: …)`.
