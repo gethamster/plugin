@@ -1,6 +1,6 @@
 ---
 name: ask-hamster
-description: Judgment only; briefs use list_briefs; graph hits use explore_entity; named tools. Ask Hamster open-ended questions that need its judgment across the workspace. Direct reads and writes go to named Hamster tools. For knowledge searches, explore a matching entity returned before summarizing decisions.
+description: Judgment only; list_briefs for briefs; always explore_entity on graph matches. Ask Hamster open-ended questions that need its judgment across the workspace. Direct reads and writes go to named Hamster tools. For knowledge searches, explore a matching entity returned before summarizing decisions.
 ---
 
 # Ask Hamster
