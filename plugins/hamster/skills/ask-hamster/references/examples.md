@@ -1,6 +1,6 @@
 # Examples
 
-Pass these as the prompt to the Hamster MCP ask tool or `hamster chat`. Include local paths, branch, and diff in the same prompt when they help. Each one asks for judgment across the workspace; a direct read or write, such as listing briefs or creating a note, goes to its named Hamster MCP tool instead.
+Pass these as the prompt to the Hamster MCP ask tool or `hamster chat`. Include local paths, branch, and diff in the same prompt when they help. Each one asks for judgment across the workspace; direct reads and writes go to the named Hamster MCP tools instead.
 
 ## Connect current work to priorities
 

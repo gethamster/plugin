@@ -127,7 +127,7 @@ The readiness path. Noninteractive check first (`ensure-ready`). If the CLI is i
 
 #### `/hamster:ask-hamster`
 
-The gateway for open-ended questions about Hamster's connected workspace context, such as how the code you're changing relates to priorities, blueprints, or decisions. Asks through the `ask_hamster` MCP tool when the client has it; otherwise `hamster chat` is the same ask path over the CLI. Direct reads and writes (listing briefs, reading plans and tasks, searching knowledge, creating notes or briefs) go to the named Hamster MCP tools instead. For example:
+The gateway for open-ended questions that need Hamster's judgment across the workspace, such as how the code you're changing relates to priorities, blueprints, or decisions. Asks through the `ask_hamster` MCP tool when the client has it; otherwise `hamster chat` is the same ask path over the CLI. Direct reads and writes go to the named Hamster MCP tools instead. For example:
 
 ```
 /hamster:ask-hamster I'm modifying auth middleware in apps/web/app/api/. What does our blueprint say about third-party integrations?
