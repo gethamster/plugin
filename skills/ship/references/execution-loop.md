@@ -18,6 +18,8 @@ Launch a worker for EVERY **task-executor** in this wave in one batch, using wha
 2. **Generic subagent + canonical body** — otherwise launch a generic subagent / worker and inject `references/agents/task-executor.md` from this skill directory as its full instructions. Prefer the client's strongest available coding model when the client lets you pin a model; otherwise inherit.
 3. **Inline** — if the client has no subagent/worker primitive, execute that same protocol in this session.
 
+On Gemini CLI, skip step 1 for task-executor and wave-reviewer: their registered agents name Claude models, which Gemini can't call, so use step 2 with Gemini's own generalist subagent.
+
 Each worker receives: parent display ID, subtask display IDs in order, brief slug, account slug, and the paths to `brief.md` and `spec.md` in the brief's `.hamster/{account}/briefs/{slug}/` folder (`spec.md` is absent when the brief has no spec; then the brief alone is the authority). Do not summarise either file for the executor, and tell it: "Read `brief.md` and `spec.md` in full before your first change. The brief says what the user sees; the spec says what is reused. A task that contradicts either is a PLAN_ISSUE, not an instruction." Executors load project skills and discover codebase context themselves — do not pre-chew context for them.
 
 Wait for all to complete; collect each executor's file list, deviations, and any PLAN_ISSUE.
