@@ -98,7 +98,12 @@ pi install npm:@tryhamster/pi
 
 To track the repository instead of npm releases, run `pi install git:github.com/gethamster/plugin`.
 
-Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to install it and sign in.
+The Pi package installs the skills only. To connect the hosted MCP server, add it and sign in:
+
+```text
+pi mcp add hamster --url https://tryhamster.com/mcp
+pi mcp login hamster
+```
 
 ## After install
 
