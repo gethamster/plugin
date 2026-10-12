@@ -4,8 +4,9 @@
  * Generate plugins/hamster/agents/*.md as native-agent projections over the
  * canonical skill-local prompt bodies under
  * plugins/hamster/skills/ship/references/agents/, the root
- * .grok-plugin/plugin.json from plugins/hamster/plugin.json, and the Gemini
- * extension at the root: gemini-extension.json, skills/, and agents/.
+ * .grok-plugin/plugin.json and package.json from plugins/hamster/plugin.json,
+ * and the Gemini extension at the root: gemini-extension.json, skills/, and
+ * agents/.
  *
  * Usage:
  *   node scripts/sync-adapters.mjs          # write generated files
@@ -110,7 +111,7 @@ export async function syncAdapters({ check = false } = {}) {
     });
   }
 
-  await syncGrokRootManifest({ check, errors, written });
+  await syncRootManifests({ check, errors, written });
   await syncGeminiExtension({ check, errors, written });
   await syncGeminiSkills({ check, errors, written });
 
@@ -120,58 +121,83 @@ export async function syncAdapters({ check = false } = {}) {
 // `grok plugin install gethamster/plugin` reads a manifest at the source root
 // and never follows a marketplace catalog. This root manifest points Grok into
 // plugins/hamster, so the published command and existing installs keep
-// working. Its name, version, and description come from the plugin's own
-// plugin.json; `agents` must stay a directory string, since Grok loads no
-// agents from an array of files.
+// working. `agents` must stay a directory string, since Grok loads no agents
+// from an array of files.
 export const GROK_ROOT_MANIFEST = path.join(".grok-plugin", "plugin.json");
 
-async function syncGrokRootManifest({ check, errors, written }) {
-  const sourcePath = path.join(repoRoot, pluginDir, "plugin.json");
-  let source;
-  try {
-    source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
-  } catch (error) {
-    errors.push(`Could not read ${path.relative(repoRoot, sourcePath)} to render ${GROK_ROOT_MANIFEST}: ${error.message}`);
-    return;
-  }
+// Pi installs a git repository from its root, and the same package.json is the
+// npm package Pi's catalog lists: the catalog picks up npm packages with the
+// pi-package keyword. `files` ships only the skills; npm adds README.md,
+// LICENSE, and package.json on its own.
+const PI_PACKAGE_MANIFEST = "package.json";
+const PI_PACKAGE_NAME = "@tryhamster/pi";
+const PI_SKILLS = "plugins/hamster/skills";
 
-  const rendered = `${JSON.stringify(
-    {
+// Each root manifest is rendered from the plugin's own plugin.json, so a plugin
+// bump moves every client together. `fields` lists what each one copies from
+// it; a missing field fails the sync instead of writing a manifest without it.
+// The Pi package sets its own npm name.
+const ROOT_MANIFESTS = [
+  {
+    target: GROK_ROOT_MANIFEST,
+    fields: ["name", "version", "description"],
+    render: (source) => ({
       name: source.name,
       version: source.version,
       description: source.description,
       skills: "./plugins/hamster/skills",
       agents: "./plugins/hamster/agents",
       mcpServers: "./plugins/hamster/.mcp.json",
-    },
-    null,
-    2
-  )}\n`;
+    }),
+  },
+  {
+    target: PI_PACKAGE_MANIFEST,
+    fields: ["version", "description", "keywords", "homepage", "repository", "license", "author"],
+    render: (source) => ({
+      name: PI_PACKAGE_NAME,
+      version: source.version,
+      description: source.description,
+      keywords: ["pi-package", ...source.keywords],
+      homepage: source.homepage,
+      repository: { type: "git", url: `git+${source.repository}.git` },
+      license: source.license,
+      author: source.author,
+      files: [PI_SKILLS],
+      pi: { skills: [`./${PI_SKILLS}`] },
+      publishConfig: { access: "public" },
+    }),
+  },
+];
 
-  const targetPath = path.join(repoRoot, GROK_ROOT_MANIFEST);
-  if (check) {
-    let existing;
-    try {
-      existing = await fs.readFile(targetPath, "utf8");
-    } catch (error) {
-      errors.push(
-        error.code === "ENOENT"
-          ? `Generated ${GROK_ROOT_MANIFEST} is missing. Run \`node scripts/sync-adapters.mjs\`.`
-          : `Could not read ${GROK_ROOT_MANIFEST}: ${error.message}`
-      );
-      return;
-    }
-    if (existing.replace(/\r\n/g, "\n") !== rendered) {
-      errors.push(
-        `${GROK_ROOT_MANIFEST} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
-      );
-    }
+async function syncRootManifests({ check, errors, written }) {
+  const sourcePath = path.join(repoRoot, pluginDir, "plugin.json");
+  let source;
+  try {
+    source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
+  } catch (error) {
+    errors.push(`Could not read ${path.relative(repoRoot, sourcePath)} to render the root manifests: ${error.message}`);
     return;
   }
 
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, rendered, "utf8");
-  written.push(GROK_ROOT_MANIFEST);
+  for (const { target, fields, render } of ROOT_MANIFESTS) {
+    const missing = fields.filter((field) => source?.[field] == null || source[field] === "");
+    if (missing.length > 0) {
+      errors.push(`${path.relative(repoRoot, sourcePath)} must set ${missing.join(", ")} to render ${target}.`);
+      continue;
+    }
+    if (fields.includes("keywords") && !Array.isArray(source.keywords)) {
+      errors.push(`${path.relative(repoRoot, sourcePath)} keywords must be an array to render ${target}.`);
+      continue;
+    }
+    await syncGeneratedFile({
+      check,
+      errors,
+      written,
+      target,
+      rendered: `${JSON.stringify(render(source), null, 2)}\n`,
+      source: path.relative(repoRoot, sourcePath),
+    });
+  }
 }
 
 // Writes one generated text file, or with `check` reports it missing or stale.

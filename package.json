@@ -1,11 +1,34 @@
 {
-  "name": "hamster-plugin",
-  "private": true,
-  "description": "Pi package manifest: Pi installs Hamster's skills from plugins/hamster.",
+  "name": "@tryhamster/pi",
+  "version": "3.5.0",
+  "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
+  "keywords": [
+    "pi-package",
+    "hamster",
+    "brief-execution",
+    "task-orchestration",
+    "ai-workflow",
+    "workflow-automation"
+  ],
+  "homepage": "https://tryhamster.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gethamster/plugin.git"
+  },
   "license": "MIT",
+  "author": {
+    "name": "Hamster",
+    "email": "hello@tryhamster.com"
+  },
+  "files": [
+    "plugins/hamster/skills"
+  ],
   "pi": {
     "skills": [
       "./plugins/hamster/skills"
     ]
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
