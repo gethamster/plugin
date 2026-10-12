@@ -15,10 +15,8 @@ import process from "node:process";
 import { syncAdapters } from "./sync-adapters.mjs";
 
 const repoRoot = process.cwd();
-// Every client except Gemini CLI and agy installs this one folder. Those two
-// install the repository root, where sync-adapters.mjs generates the Gemini
-// extension from this folder. The root otherwise holds the marketplace catalogs
-// that point here, plus maintainer tooling.
+// Every client installs this one folder. The repository root holds only the
+// marketplace catalogs that point at it, plus maintainer tooling.
 const PLUGIN_PATH = "plugins/hamster";
 const PLUGIN_SOURCE = `./${PLUGIN_PATH}`;
 const pluginDir = path.join(repoRoot, PLUGIN_PATH);
@@ -28,13 +26,11 @@ const pluginNamePattern = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/;
 // plugin.yml derives the public plugin-v<version> git tag from this value, so a
 // malformed version must fail on the PR rather than when the tag job runs on main.
 const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
-// plugins/hamster/plugin.json is the manifest Antigravity reads when it installs
-// this folder on its own; a repository-root install reads the generated
-// gemini-extension.json instead. Without it, Antigravity stages the MCP server
-// with an empty command instead of the URL in mcp_config.json. The file keeps
-// the Agent Plugins fields. It must not declare "$schema": with the Agent
-// Plugins schema, Copilot CLI reads agents only from com.github.copilot/agents/
-// and registers neither worker.
+// plugins/hamster/plugin.json is the manifest Antigravity reads. Without it,
+// Antigravity stages the MCP server with an empty command instead of the URL
+// in mcp_config.json. The file keeps the Agent Plugins fields. It must not
+// declare "$schema": with the Agent Plugins schema, Copilot CLI reads agents
+// only from com.github.copilot/agents/ and registers neither worker.
 const pluginManifestFields = new Set([
   "name",
   "version",
@@ -727,10 +723,9 @@ async function validateCodex(version) {
 async function validateMcpFiles() {
   const urls = new Map();
 
-  // Antigravity reads mcp_config.json when it installs this folder on its own.
-  // Claude Code, Codex, Copilot CLI, and Grok Build read .mcp.json. Cursor does
-  // not: it loads mcp.json unless .cursor-plugin/plugin.json sets mcpServers to
-  // "./.mcp.json".
+  // Antigravity reads mcp_config.json. Claude Code, Codex, Copilot CLI, and
+  // Grok Build read .mcp.json. Cursor does not: it loads mcp.json unless
+  // .cursor-plugin/plugin.json sets mcpServers to "./.mcp.json".
   const config = await readJsonFile(path.join(pluginDir, "mcp_config.json"), `${PLUGIN_PATH}/mcp_config.json`);
   if (config) {
     const serverUrl = config.mcpServers?.hamster?.serverUrl;
@@ -781,7 +776,7 @@ async function validateNoAntigravityNest() {
   // package that root installs replaced.
   for (const nestRoot of [".agents", "_agents"]) {
     if (await pathExists(path.join(repoRoot, nestRoot, "plugins", "hamster"))) {
-      addError(`Delete ${nestRoot}/plugins/hamster; agy installs Hamster from the repository root.`);
+      addError(`Delete ${nestRoot}/plugins/hamster; agy installs ${PLUGIN_PATH}.`);
     }
   }
 }
@@ -940,19 +935,20 @@ async function validateLayout() {
   await validateAgents(pluginDir, "hamster");
 }
 
-// The root holds the Gemini extension: gemini-extension.json, skills/, and
-// agents/, which sync-adapters.mjs generates from plugins/hamster and checks for
-// drift. agy installs that root as one plugin, so it gets all of those skills
-// and agents. Any other plugin manifest or component at the root would change
-// what agy or another client installs, so these stay in plugins/hamster.
+// A plugin manifest or component at the repository root turns clients back to
+// a root install: agy then skips plugins/ and installs 0 skills while still
+// reporting [ok].
 const ROOT_PLUGIN_ENTRIES = [
   "plugin.json",
+  "gemini-extension.json",
   ".claude-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
   ".codex-plugin",
   ".mcp.json",
   "mcp.json",
   "mcp_config.json",
+  "skills",
+  "agents",
   "com.github.copilot",
 ];
 
@@ -963,10 +959,9 @@ async function validateRootHasNoPlugin() {
     }
   }
 
-  // Beside the marketplace catalogs and the generated gemini-extension.json,
-  // .grok-plugin/plugin.json is the one plugin manifest the root may hold. agy
-  // installs the root, so any other <client>-plugin/plugin.json there would
-  // change what it installs.
+  // Beside the marketplace catalogs, .grok-plugin/plugin.json is the one plugin
+  // manifest the root may hold. Any other <client>-plugin/plugin.json there
+  // turns that client (or agy) back to a root install.
   for (const entry of await fs.readdir(repoRoot, { withFileTypes: true })) {
     if (!entry.isDirectory() || !/^\.[A-Za-z0-9_-]+-plugin$/.test(entry.name) || entry.name === ".grok-plugin") {
       continue;
