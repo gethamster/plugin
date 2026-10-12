@@ -137,11 +137,14 @@ const PI_PACKAGE_MANIFEST = "package.json";
 const PI_PACKAGE_NAME = "@tryhamster/pi";
 const PI_SKILLS = "plugins/hamster/skills";
 
-// Each root manifest takes its version and description from the plugin's own
-// plugin.json, so a plugin bump moves every client together.
+// Each root manifest is rendered from the plugin's own plugin.json, so a plugin
+// bump moves every client together. `fields` lists what each one copies from
+// it; a missing field fails the sync instead of writing a manifest without it.
+// The Pi package sets its own npm name.
 const ROOT_MANIFESTS = [
   {
     target: GROK_ROOT_MANIFEST,
+    fields: ["name", "version", "description"],
     render: (source) => ({
       name: source.name,
       version: source.version,
@@ -153,6 +156,7 @@ const ROOT_MANIFESTS = [
   },
   {
     target: PI_PACKAGE_MANIFEST,
+    fields: ["version", "description", "keywords", "homepage", "repository", "license", "author"],
     render: (source) => ({
       name: PI_PACKAGE_NAME,
       version: source.version,
@@ -179,7 +183,16 @@ async function syncRootManifests({ check, errors, written }) {
     return;
   }
 
-  for (const { target, render } of ROOT_MANIFESTS) {
+  for (const { target, fields, render } of ROOT_MANIFESTS) {
+    const missing = fields.filter((field) => source?.[field] == null || source[field] === "");
+    if (missing.length > 0) {
+      errors.push(`${path.relative(repoRoot, sourcePath)} must set ${missing.join(", ")} to render ${target}.`);
+      continue;
+    }
+    if (fields.includes("keywords") && !Array.isArray(source.keywords)) {
+      errors.push(`${path.relative(repoRoot, sourcePath)} keywords must be an array to render ${target}.`);
+      continue;
+    }
     const rendered = `${JSON.stringify(render(source), null, 2)}\n`;
     const targetPath = path.join(repoRoot, target);
     if (check) {

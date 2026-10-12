@@ -1081,11 +1081,11 @@ async function validatePiPackage() {
   if (manifest.private) {
     addError("Root package.json must not be private; it is the npm package Pi's catalog lists.");
   }
-  if (!manifest.keywords?.includes("pi-package")) {
-    addError('Root package.json keywords must include "pi-package" for Pi\'s catalog to list it.');
+  if (!Array.isArray(manifest.keywords) || !manifest.keywords.includes("pi-package")) {
+    addError('Root package.json keywords must be an array that includes "pi-package" for Pi\'s catalog to list it.');
   }
-  if (!manifest.files?.includes(`${PLUGIN_PATH}/skills`)) {
-    addError(`Root package.json files must include "${PLUGIN_PATH}/skills" so the npm package ships the skills.`);
+  if (!Array.isArray(manifest.files) || !manifest.files.includes(`${PLUGIN_PATH}/skills`)) {
+    addError(`Root package.json files must be an array that includes "${PLUGIN_PATH}/skills" so the npm package ships the skills.`);
   }
 }
 

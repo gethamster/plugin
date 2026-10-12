@@ -515,7 +515,8 @@ test("a Pi package that drifts, goes private, or stops shipping plugins/hamster 
   manifest.version = "0.0.1";
   manifest.private = true;
   manifest.keywords = ["hamster"];
-  manifest.files = ["skills"];
+  // A string passes a substring check but is not a files list npm accepts.
+  manifest.files = "plugins/hamster/skills";
   manifest.pi.skills = ["./skills"];
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -524,14 +525,31 @@ test("a Pi package that drifts, goes private, or stops shipping plugins/hamster 
   assert.match(result.stderr, /package\.json is out of sync with plugins\/hamster\/plugin\.json/);
   assert.match(result.stderr, /Root package\.json must set pi\.skills to \["\.\/plugins\/hamster\/skills"\]/);
   assert.match(result.stderr, /Root package\.json must not be private/);
-  assert.match(result.stderr, /Root package\.json keywords must include "pi-package"/);
-  assert.match(result.stderr, /Root package\.json files must include "plugins\/hamster\/skills"/);
+  assert.match(result.stderr, /Root package\.json keywords must be an array that includes "pi-package"/);
+  assert.match(result.stderr, /Root package\.json files must be an array that includes "plugins\/hamster\/skills"/);
 
   const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
   assert.equal(sync.code, 0, sync.stderr);
   assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
   const repaired = await runValidator(cwd);
   assert.equal(repaired.code, 0, repaired.stderr);
+});
+
+test("a plugin.json missing a field the Pi package copies stops the sync", async () => {
+  const cwd = await makeTemp("hamster-plugin-pi-source-");
+  await copyPackage(cwd);
+  const manifestPath = path.join(cwd, "package.json");
+  const before = await readFile(manifestPath, "utf8");
+  const sourcePath = plugin(cwd, "plugin.json");
+  const source = JSON.parse(await readFile(sourcePath, "utf8"));
+  // Rendering without it would publish "git+undefined.git" as the repository.
+  delete source.repository;
+  await writeFile(sourcePath, `${JSON.stringify(source, null, 2)}\n`);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.notEqual(sync.code, 0);
+  assert.match(sync.stderr, /plugins\/hamster\/plugin\.json must set repository to render package\.json/);
+  assert.equal(await readFile(manifestPath, "utf8"), before);
 });
 
 test("a drifted duplicate fails validation", async () => {
