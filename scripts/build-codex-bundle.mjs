@@ -3,8 +3,12 @@
 /**
  * Stage and zip the plugin package uploaded to OpenAI's Plugins Directory.
  *
- * The bundle is the Codex manifest, its .mcp.json (the hosted Hamster MCP
- * server), the skills tree, the license, and the listing images in assets/.
+ * The bundle is the Codex manifest from plugins/hamster, its .mcp.json (the
+ * hosted Hamster MCP server), the skills tree, and the license. The listing
+ * images come from the root assets/. plugins/hamster also carries those same
+ * three PNGs for a marketplace install; this zip copies the root assets/ once
+ * and does not also copy plugins/hamster/assets, so the archive does not
+ * contain the same image twice.
  *
  * The directory can't add an MCP server to a plugin first uploaded without one,
  * so the connector ships in the first upload.
@@ -26,6 +30,7 @@ import path from "node:path";
 import process from "node:process";
 
 const repoRoot = process.cwd();
+const pluginDir = path.join(repoRoot, "plugins", "hamster");
 
 // The directory listing's images, added to the staged manifest only.
 const LISTING_IMAGES = {
@@ -130,7 +135,7 @@ function requireCleanCheckout(outDir) {
 }
 
 async function listSkillNames() {
-  const skillsDir = path.join(repoRoot, "skills");
+  const skillsDir = path.join(pluginDir, "skills");
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
   const names = entries
     .filter((entry) => entry.isDirectory())
@@ -138,7 +143,7 @@ async function listSkillNames() {
     .sort();
 
   if (names.length === 0) {
-    throw new Error("skills/ has no skill directories; the directory rejects a bundle with no skill.");
+    throw new Error("plugins/hamster/skills/ has no skill directories; the directory rejects a bundle with no skill.");
   }
 
   return names;
@@ -179,7 +184,7 @@ async function stageBundle(stagingDir, skillNames) {
   await fs.rm(stagingDir, { recursive: true, force: true });
   await fs.mkdir(path.join(stagingDir, ".codex-plugin"), { recursive: true });
 
-  const manifest = await readJsonFile(path.join(repoRoot, ".codex-plugin", "plugin.json"));
+  const manifest = await readJsonFile(path.join(pluginDir, ".codex-plugin", "plugin.json"));
   for (const key of EXCLUDED_MANIFEST_KEYS) {
     delete manifest[key];
   }
@@ -190,18 +195,30 @@ async function stageBundle(stagingDir, skillNames) {
   );
 
   for (const name of skillNames) {
-    await fs.cp(path.join(repoRoot, "skills", name), path.join(stagingDir, "skills", name), {
+    await fs.cp(path.join(pluginDir, "skills", name), path.join(stagingDir, "skills", name), {
       recursive: true,
       dereference: true,
     });
   }
   await replaceInstallSection(path.join(stagingDir, SETUP_SKILL));
 
+  // One assets/ tree, from the repository root. plugins/hamster/assets/ is the
+  // marketplace copy of the three PNGs; copying it too would archive them twice.
   await fs.cp(path.join(repoRoot, "assets"), path.join(stagingDir, "assets"), {
     recursive: true,
     dereference: true,
   });
-  await fs.cp(path.join(repoRoot, MCP_CONFIG), path.join(stagingDir, MCP_CONFIG));
+  const pluginAssets = path.join(pluginDir, "assets");
+  if (await pathExists(pluginAssets)) {
+    for (const name of await fs.readdir(pluginAssets)) {
+      if (!(await pathExists(path.join(stagingDir, "assets", name)))) {
+        throw new Error(
+          `${name} is in plugins/hamster/assets but missing from the staged root assets/. The bundle copies root assets/ once.`
+        );
+      }
+    }
+  }
+  await fs.cp(path.join(pluginDir, MCP_CONFIG), path.join(stagingDir, MCP_CONFIG));
   await fs.cp(path.join(repoRoot, "LICENSE"), path.join(stagingDir, "LICENSE"));
 }
 
@@ -337,9 +354,9 @@ async function main() {
   const outDir = path.resolve(repoRoot, options.out);
   requireCleanCheckout(outDir);
 
-  const { version } = await readJsonFile(path.join(repoRoot, "plugin.json"));
+  const { version } = await readJsonFile(path.join(pluginDir, "plugin.json"));
   if (!version) {
-    throw new Error("plugin.json has no version.");
+    throw new Error("plugins/hamster/plugin.json has no version.");
   }
 
   const stagingDir = path.join(outDir, "codex-plugin");

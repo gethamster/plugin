@@ -1,11 +1,11 @@
 {
   "name": "hamster-plugin",
   "private": true,
-  "description": "Pi package manifest: Pi installs Hamster's skills from skills/.",
+  "description": "Pi package manifest: Pi installs Hamster's skills from plugins/hamster.",
   "license": "MIT",
   "pi": {
     "skills": [
-      "./skills"
+      "./plugins/hamster/skills"
     ]
   }
 }

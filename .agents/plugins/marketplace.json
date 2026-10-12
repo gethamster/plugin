@@ -8,7 +8,7 @@
       "name": "hamster",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/hamster"
       },
       "policy": {
         "installation": "AVAILABLE",
