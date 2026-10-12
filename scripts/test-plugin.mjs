@@ -15,15 +15,20 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 // path built from where the checkout happens to live.
 const VALIDATOR = "scripts/validate-plugin.mjs";
 const BUNDLE_BUILDER = "scripts/build-codex-bundle.mjs";
-const READY_SCRIPT = "plugins/hamster/skills/setup/scripts/ensure-ready.sh";
+const READY_SCRIPT = "skills/setup/scripts/ensure-ready.sh";
 
 const PACKAGE_ENTRIES = [
-  "plugins",
+  "skills",
+  "agents",
+  ".codex-plugin",
+  ".mcp.json",
+  "mcp_config.json",
+  "plugin.json",
+  "gemini-extension.json",
   "package.json",
   "LICENSE",
   ".cursor-plugin",
   ".claude-plugin",
-  ".grok-plugin",
   ".agents",
   "assets",
   "scripts",
@@ -31,9 +36,9 @@ const PACKAGE_ENTRIES = [
   "README.md",
 ];
 
-// The folder every client installs, inside a fixture copy.
+// The plugin every client installs is the root of a fixture copy.
 function plugin(cwd, ...segments) {
-  return path.join(cwd, "plugins", "hamster", ...segments);
+  return path.join(cwd, ...segments);
 }
 
 const fixtures = [];
@@ -143,8 +148,8 @@ test("ENOENT on plugin.json is reported as missing", async () => {
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/plugin\.json is missing:/);
-  assert.doesNotMatch(result.stderr, /plugins\/hamster\/plugin\.json could not be read/);
+  assert.match(result.stderr, /\.\/plugin\.json is missing:/);
+  assert.doesNotMatch(result.stderr, /\.\/plugin\.json could not be read/);
 });
 
 test("non-ENOENT on plugin.json is reported as could not be read", async () => {
@@ -155,8 +160,8 @@ test("non-ENOENT on plugin.json is reported as could not be read", async () => {
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/plugin\.json could not be read \(/);
-  assert.doesNotMatch(result.stderr, /plugins\/hamster\/plugin\.json is missing:/);
+  assert.match(result.stderr, /\.\/plugin\.json could not be read \(/);
+  assert.doesNotMatch(result.stderr, /\.\/plugin\.json is missing:/);
 });
 
 test("a non-semver plugin version fails validation", async () => {
@@ -169,20 +174,20 @@ test("a non-semver plugin version fails validation", async () => {
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/plugin\.json "version" must be semver-like, got "3\.4"/);
+  assert.match(result.stderr, /\.\/plugin\.json "version" must be semver-like, got "3\.4"/);
 });
 
-test("a Claude marketplace that installs from the repository root fails validation", async () => {
+test("a Claude marketplace that installs from a subfolder fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-claude-source-");
   await copyPackage(cwd);
   const marketplacePath = path.join(cwd, ".claude-plugin", "marketplace.json");
   const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
-  marketplace.plugins[0].source = "./";
+  marketplace.plugins[0].source = "./plugins/hamster";
   await writeFile(marketplacePath, `${JSON.stringify(marketplace, null, 2)}\n`);
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Claude marketplace\.json plugins\[0\]\.source must be "\.\/plugins\/hamster"/);
+  assert.match(result.stderr, /Claude marketplace\.json plugins\[0\]\.source must be "\.\/"/);
 });
 
 test("a missing referenced path fails validation", async () => {
@@ -387,78 +392,39 @@ test("a plugin description that drifts from its siblings fails validation", asyn
   assert.match(result.stderr, /Plugin descriptions have drifted across manifests/);
 });
 
-test("a plugin manifest left at the repository root fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-root-manifest-");
-  await copyPackage(cwd);
-  // agy installs 0 skills, and still reports [ok], when the root has one.
-  await cp(plugin(cwd, "plugin.json"), path.join(cwd, "plugin.json"));
-  await cp(plugin(cwd, "skills"), path.join(cwd, "skills"), { recursive: true });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugin\.json must not exist at the repository root/);
-  assert.match(result.stderr, /skills must not exist at the repository root/);
-});
-
-test("a Grok root manifest that drifts or stops pointing into plugins/hamster fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-grok-root-");
-  await copyPackage(cwd);
-  const manifestPath = path.join(cwd, ".grok-plugin", "plugin.json");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  // A release that bumps plugins/hamster but not this file, and an agents
-  // array, which Grok reads as zero agents.
-  manifest.version = "0.0.1";
-  manifest.agents = ["./plugins/hamster/agents/task-executor.md"];
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  await mkdir(path.join(cwd, ".gemini-plugin"), { recursive: true });
-  await writeFile(path.join(cwd, ".gemini-plugin", "plugin.json"), "{}\n");
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /\.grok-plugin\/plugin\.json is out of sync with plugins\/hamster\/plugin\.json/);
-  assert.match(result.stderr, /\.grok-plugin\/plugin\.json agents must be the directory path "\.\/plugins\/hamster\/agents"/);
-  assert.match(result.stderr, /\.gemini-plugin\/plugin\.json must not exist at the repository root; only \.grok-plugin\/plugin\.json may/);
-
-  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
-  assert.equal(sync.code, 0, sync.stderr);
-  assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
-});
-
-test("a symlink or an image inside plugins/hamster fails validation", async () => {
+test("a symlink or an image in what clients load fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-folder-files-");
   await copyPackage(cwd);
-  await symlink("agents", plugin(cwd, "linked-agents"));
+  await symlink("../agents", plugin(cwd, "skills", "linked-agents"));
   await cp(path.join(cwd, "assets", "logo.png"), plugin(cwd, "skills", "setup", "logo.png"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/linked-agents is a symbolic link/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/logo\.png is an image/);
+  assert.match(result.stderr, /skills\/linked-agents is a symbolic link/);
+  assert.match(result.stderr, /skills\/setup\/logo\.png is an image/);
+  assert.doesNotMatch(result.stderr, /assets\/logo\.png is an image/);
 });
 
-test("images inside plugins/hamster fail except the Claude icon and the three Codex listing PNGs", async () => {
+test("images in what clients load fail except the Claude icon", async () => {
   const cwd = await makeTemp("hamster-plugin-icon-");
   await copyPackage(cwd);
   const iconPath = plugin(cwd, ".claude-plugin", "icon.svg");
   // The same SVG anywhere else in the plugin is still a bundled image.
-  await cp(iconPath, plugin(cwd, "icon.svg"));
+  await cp(iconPath, plugin(cwd, ".cursor-plugin", "icon.svg"));
   await cp(iconPath, plugin(cwd, "skills", "setup", "icon.svg"));
   const icon = await readFile(iconPath, "utf8");
   await writeFile(iconPath, icon.replace("</svg>", '<image href="https://example.com/logo.png"/></svg>'));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/icon\.svg is an image/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/icon\.svg is an image/);
-  assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not contain <image>/);
-  assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not reference external resources/);
+  assert.match(result.stderr, /\.cursor-plugin\/icon\.svg is an image/);
+  assert.match(result.stderr, /skills\/setup\/icon\.svg is an image/);
+  assert.match(result.stderr, /\.claude-plugin\/icon\.svg must not contain <image>/);
+  assert.match(result.stderr, /\.claude-plugin\/icon\.svg must not reference external resources/);
   assert.doesNotMatch(result.stderr, /\.claude-plugin\/icon\.svg is an image/);
-  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/icon\.png is an image/);
-  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/logo\.png is an image/);
-  assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/logo-dark\.png is an image/);
 });
 
-test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
+test("an Agent Plugins $schema in plugin.json fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-schema-");
   await copyPackage(cwd);
   // Copilot CLI then reads agents only from com.github.copilot/agents/.
@@ -471,10 +437,10 @@ test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation",
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/plugin\.json must not declare "\$schema"/);
+  assert.match(result.stderr, /\.\/plugin\.json must not declare "\$schema"/);
 });
 
-test("the three Codex listing images inside plugins/hamster pass validation", async () => {
+test("the three Codex listing images in assets/ pass validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-icons-");
   await copyPackage(cwd);
 
@@ -493,29 +459,39 @@ test("a Codex image other than the three listing PNGs fails validation", async (
     iface.logo = "./assets/logo.svg";
     iface.screenshots = ["./assets/shot.png"];
   });
-  await cp(path.join(cwd, "assets", "logo.svg"), plugin(cwd, "assets", "logo.svg"));
-  const icon = plugin(cwd, "assets", "icon.png");
-  await writeFile(icon, Buffer.concat([await readFile(icon), Buffer.from([0])]));
+  await rm(plugin(cwd, "assets", "icon.png"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /interface\.logo must be "\.\/assets\/logo\.png"/);
   assert.match(result.stderr, /interface\.screenshots must not be set/);
-  assert.match(result.stderr, /plugins\/hamster\/assets\/logo\.svg is an image/);
-  assert.match(result.stderr, /plugins\/hamster\/assets\/icon\.png must match root assets\/icon\.png byte for byte/);
+  assert.match(result.stderr, /interface\.composerIcon file assets\/icon\.png must exist/);
 });
 
-test("a Pi manifest that stops pointing at plugins/hamster fails validation", async () => {
+test("a Pi manifest that stops pointing at skills/ fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-pi-");
   await copyPackage(cwd);
   const manifestPath = path.join(cwd, "package.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  manifest.pi.skills = ["./skills"];
+  manifest.pi.skills = ["./plugins/hamster/skills"];
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Root package\.json must set pi\.skills to \["\.\/plugins\/hamster\/skills"\]/);
+  assert.match(result.stderr, /Root package\.json must set pi\.skills to \["\.\/skills"\]/);
+});
+
+test("a gemini-extension.json version that drifts fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-gemini-version-");
+  await copyPackage(cwd);
+  const manifestPath = plugin(cwd, "gemini-extension.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.version = "0.0.1";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /gemini-extension\.json version "0\.0\.1" does not match/);
 });
 
 test("a drifted duplicate fails validation", async () => {
@@ -566,14 +542,13 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   assert.equal(mcpDump.code, 0, mcpDump.stderr);
   assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, "https://tryhamster.com/mcp");
   assert.equal(manifest.interface.displayName, "Hamster");
-  // Root assets/ is copied once. plugins/hamster/assets/ is not archived beside it.
+  // Root assets/ is copied once.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
   assert.equal(manifest.interface.logo, "./assets/logo.png");
   assert.equal(manifest.interface.logoDark, "./assets/logo-dark.png");
   for (const image of ["assets/icon.png", "assets/logo.png", "assets/logo-dark.png", "assets/logo.svg", "assets/logo-dark.svg"]) {
     assert.equal(entries.filter((entry) => entry === image).length, 1, image);
   }
-  assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
   assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
 
   // The directory's setup asks the user to install the CLI; every other section stays.
@@ -617,7 +592,7 @@ test("an uncommitted bundle source stops the build", async () => {
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Commit or stash your changes first/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/ship\/SKILL\.md/);
+  assert.match(result.stderr, /skills\/ship\/SKILL\.md/);
   assert.equal(await pathExists(zipPath), false);
 });
 

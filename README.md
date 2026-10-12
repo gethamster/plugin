@@ -4,6 +4,8 @@
 
 This is the Hamster product: Agent Plugins skills on every supported client, hosted MCP on every client that supports MCP and installs from GitHub or a marketplace, plus generated native execution workers on Claude Code, GitHub Copilot CLI, and Grok Build. The CLI is how the plan stays in this repo. It is not a second install.
 
+[Privacy Policy](https://tryhamster.com/privacy-policy) · [Terms of Service](https://tryhamster.com/terms-of-service) · [Docs](https://tryhamster.com/docs) · [Source](https://github.com/gethamster/plugin)
+
 ## Install
 
 Installation differs by client. If you use more than one, install Hamster separately for each one.
@@ -69,7 +71,7 @@ agy plugin install https://github.com/gethamster/plugin
 
 In the Antigravity app (2.15 or newer), authenticate `hamster_hamster` under Settings → Customizations → Installed MCP Servers. The plugin registers that server itself, so a manual `hamster` entry in `mcp_config.json` would add a second copy of every tool.
 
-Using GitHub Copilot CLI, Grok Build, or Pi? See [More install options](#more-install-options).
+Using GitHub Copilot CLI, Grok Build, Gemini CLI, or Pi? See [More install options](#more-install-options).
 
 ## More install options
 
@@ -90,6 +92,14 @@ grok plugin install gethamster/plugin --trust
 
 To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`.
 
+### Gemini CLI
+
+```text
+gemini extensions install https://github.com/gethamster/plugin
+```
+
+To sign in to the hosted MCP server, run `/mcp auth hamster`.
+
 ### Pi
 
 ```text
@@ -103,6 +113,17 @@ Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to in
 1. **Talk** — hosted MCP at `https://tryhamster.com/mcp`, or `hamster chat` when MCP tools are unavailable and the CLI is signed in. Your client owns the Hamster sign-in.
 2. **Plan on disk** — say Install Hamster, or run ship. The setup skill installs the CLI if needed, runs `hamster auth login`, and syncs the plan.
 3. **Ship** — execute the brief already on disk. Nothing runs automatically on session start.
+
+## What the plugin runs, sends, and fetches
+
+- **Hosted MCP server.** The plugin registers `https://tryhamster.com/mcp` as a remote HTTP MCP server. You sign in through your client's own OAuth flow; the plugin never reads or passes an MCP token or key. Requests you make through the Hamster tools, and the workspace data they return, travel between your client and Hamster.
+- **Hamster CLI.** When the `hamster` command is missing, the `setup` skill downloads and runs the Hamster CLI installer from https://tryhamster.com/cli/install.
+- **CLI commands.** Skills run `hamster auth login` (opens your browser to sign in), `hamster init` and `hamster sync` (write the plan to `.hamster/` in your repository), `hamster status`, `hamster chat` (sends your question to Hamster when MCP tools are unavailable), and `hamster task status` or `hamster brief status` (update status in Hamster Studio while `ship` runs). The bundled `ensure-ready` scripts only check that the CLI is installed and signed in, then run `hamster sync`. `hamster sync` also writes `.claude/skills/hamster-project-context/SKILL.md`, a guide to the synced files that the CLI fills in from a built-in template with your team name, the last sync time, and file counts.
+- **Background sync.** `ship` and `resume-hamster` keep the plan current during a run with `hamster sync --watch` in the background. They reuse a watcher already running for this repository, found with `pgrep` and `lsof`, and stop only a watcher they started.
+- **Team check.** `ship`, `plan-hamster`, and `resume-hamster` read `HAMSTER_ACCOUNT_ID`, if it is set, and compare it with the account in `.hamster/.state.json` on your machine; it is not sent anywhere. If the team doesn't match, they ask which team you mean and then run `hamster team switch --account-id <id>`, which clears the previous team's synced plan and syncs the new one.
+- **Git and GitHub.** `ship` and `resume-hamster` create a branch and commit in your repository. They push and open a pull request with `gh` only when you ask. `retro` reads merged pull requests with `gh pr list`, `qa` reads the branch's recent CI results with `gh run list`, and `qa`, `review-hamster`, and `ship` read the default branch with `gh repo view`.
+
+Nothing runs automatically when a session starts: the plugin has no hooks.
 
 ## Skills
 
@@ -218,26 +239,24 @@ Produces: metrics table, hourly distribution, session analysis, hotspots, PR siz
 | **task-executor** | Senior Engineer | Implements one parent task + subtasks; loads project skills, blueprints, and methods |
 | **wave-reviewer** | Staff Engineer | Reviews a whole wave's diff (per-parent verdicts + cross-parent integration checks), then simplifies |
 
-Canonical worker protocols live in `plugins/hamster/skills/ship/references/agents/`. `plugins/hamster/agents/task-executor.md` and `plugins/hamster/agents/wave-reviewer.md` are generated native adapters (registration + model metadata) over those bodies, and every client with native agents registers them from that one folder — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code, Copilot CLI, and Grok Build do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
+Canonical worker protocols live in `skills/ship/references/agents/`. `agents/task-executor.md` and `agents/wave-reviewer.md` are generated native adapters (registration + model metadata) over those bodies, and every client with native agents registers them from that one folder — run `node scripts/sync-adapters.mjs` after editing the canonical files; CI checks drift. Ship prefers the registered native agent when the client exposes it (Claude Code, Copilot CLI, and Grok Build do), otherwise launches a generic subagent and injects the matching canonical body, otherwise runs the same protocol inline. On the generic path, prefer the strongest available coding model for task-executor and a mid-tier model for wave-reviewer when the client can pin one; otherwise inherit. Wave scheduling, branch creation, commits, and PR creation stay inline.
 
 Executors implement unambiguous brief/spec authority over contradictory tasks and record resolved plan issues; only unresolved or unbuilt work blocks completion, and resumed PR updates retain earlier task and plan-feedback resolutions.
 
-Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`, `build-codex-bundle.mjs`); it is not part of the installed plugin.
+Every skill directory is self-contained: no SKILL.md reads a sibling skill's files, because clients are free to install or load one skill on its own. Each skill is `SKILL.md` plus optional `scripts/` and `references/`; longer procedures live in `references/` so the skill body stays within client size limits (Codex reads the first 8,000 bytes). Shared material — readiness scripts under each skill's `scripts/`, and protocols under `references/` that plan-hamster and resume-hamster re-enter — is duplicated into every skill that needs it, and `scripts/validate-plugin.mjs` hashes every copy and fails the build if they drift apart. Root `scripts/` is maintainer tooling (`sync-adapters.mjs`, `validate-plugin.mjs`, `build-codex-bundle.mjs`); no client loads it.
 
-`plugins/hamster/` is the plugin: every client installs this one folder, and it is the folder submitted to the Claude plugin directory, which scans only the folder it is given. It holds each client's manifest (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, and the `plugin.json` Antigravity needs to register the MCP server), `.mcp.json` and Antigravity's `mcp_config.json`, `skills/`, `agents/`, and its own `README.md`, which lists what the plugin runs, sends, and fetches, so update it when that changes. The repository root keeps only the marketplace catalogs that point at `./plugins/hamster` (`.claude-plugin/`, which Copilot CLI also reads, `.cursor-plugin/`, and `.agents/plugins/`), the root `package.json` whose `pi.skills` points Pi at the same skills, and maintainer tooling, CI, and listing images. `validate-plugin.mjs` fails if a plugin manifest, `skills/`, or `agents/` reappears at the root, because Antigravity then installs the root and finds 0 skills, and it fails on any symbolic link or image inside `plugins/hamster/` except `.claude-plugin/icon.svg`, the Claude plugin directory's listing icon, which must stay a self-contained SVG with no raster, script, or external reference, and the three Codex listing PNGs in `assets/`, which must match the root `assets/` copies byte for byte. `build-codex-bundle.mjs` packs the root `assets/` into the OpenAI Plugins Directory zip. The Cursor logo is a URL to the root `assets/logo.svg`. That `plugin.json` must not declare the Agent Plugins `$schema`: with it, Copilot CLI reads agents only from `com.github.copilot/agents/` and registers neither worker.
-
-The one plugin manifest at the root is `.grok-plugin/plugin.json`. Grok Build's `plugin install <repo>` reads a manifest at the repository root and doesn't follow a marketplace catalog, so this file points its `skills`, `agents`, and `mcpServers` into `plugins/hamster/`. It keeps `grok plugin install gethamster/plugin --trust` working and lets existing Grok installs update onto this layout. `agents` must stay a directory path: Grok loads no agents from an array of files. `sync-adapters.mjs` writes its name, version, and description from `plugins/hamster/plugin.json`, and `validate-plugin.mjs` checks that each path resolves and that no other `<client>-plugin/plugin.json` appears at the root. Antigravity and Pi don't read `.grok-plugin/`, and the Claude plugin directory scans only `plugins/hamster/`.
+The repository root is the plugin. Every client installs it, Grok Build included, and it is the folder submitted to the Claude plugin directory, so this README lists what the plugin runs, sends, and fetches; update it when that changes. Beside `skills/` and `agents/` sit each client's manifest (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, `gemini-extension.json`, and the `plugin.json` Antigravity needs to register the MCP server, which must not declare the Agent Plugins `$schema` or Copilot CLI registers neither worker), the marketplace catalogs that point at `./`, `.mcp.json` and Antigravity's `mcp_config.json`, and `package.json`, whose `pi.skills` points Pi at `./skills`. `validate-plugin.mjs` fails on any symbolic link or image in `skills/`, `agents/`, or the client manifest folders except `.claude-plugin/icon.svg`, which must stay a self-contained SVG; the listing images live in `assets/`, which the Codex manifest references, the Cursor logo links by URL, and `build-codex-bundle.mjs` packs into the OpenAI Plugins Directory zip.
 
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 
 | Source of truth | Copies |
 |---|---|
-| `plugins/hamster/skills/setup/scripts/ensure-ready.sh` | `ship`, `plan-hamster`, `resume-hamster` |
-| `plugins/hamster/skills/setup/scripts/ensure-ready.ps1` | `ship`, `plan-hamster`, `resume-hamster` |
-| `plugins/hamster/skills/ship/references/brief-selection.md` | `plan-hamster`, `resume-hamster` |
-| `plugins/hamster/skills/ship/references/execution-loop.md` | `resume-hamster` |
-| `plugins/hamster/skills/ship/references/agents/task-executor.md` | `resume-hamster` |
-| `plugins/hamster/skills/ship/references/agents/wave-reviewer.md` | `resume-hamster` |
+| `skills/setup/scripts/ensure-ready.sh` | `ship`, `plan-hamster`, `resume-hamster` |
+| `skills/setup/scripts/ensure-ready.ps1` | `ship`, `plan-hamster`, `resume-hamster` |
+| `skills/ship/references/brief-selection.md` | `plan-hamster`, `resume-hamster` |
+| `skills/ship/references/execution-loop.md` | `resume-hamster` |
+| `skills/ship/references/agents/task-executor.md` | `resume-hamster` |
+| `skills/ship/references/agents/wave-reviewer.md` | `resume-hamster` |
 
 ### Execution loop
 
@@ -319,6 +338,21 @@ The hosted MCP tools work on one active team per user, which isn't tied to any r
 ## Advanced: hosted MCP without the plugin
 
 Use this only when you want the hosted MCP tools in a client without installing the plugin. Add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth; see the [MCP server docs](https://tryhamster.com/docs/hamster-studio/mcp) for setup, the tool list, and client registration. Skills, slash commands, the CLI, and `/ship` come with the plugin.
+
+## Troubleshooting
+
+- **A skill prints `SETUP_NEEDED`.** Run `/hamster:setup`. It installs the CLI if it is missing, signs you in, and syncs. If it still prints `SETUP_NEEDED`, it shows the error from `hamster status` or `hamster sync`.
+- **`hamster: command not found` after setup.** The installer puts the CLI in `~/.hamster/bin` and adds that folder to PATH in your shell profile. Open a new terminal, or run `export PATH="$HOME/.hamster/bin:$PATH"`.
+- **Hamster tools are missing or ask you to sign in.** Sign in to the hosted MCP server as your client's install section above describes (in Claude Code, open `/mcp`, select `plugin:hamster:hamster`, and authenticate). Until you do, `/hamster:ask-hamster` uses `hamster chat` when the CLI is signed in.
+- **"This repository's Hamster team isn't available to this MCP sign-in."** Your MCP sign-in and this repository's `.hamster/` belong to different teams. Run `hamster init --force` in the repository to pick the team again, or sign in to the Hamster MCP server as the user who belongs to this repository's team.
+- **A skill prints `ACCOUNT_UNRESOLVED`.** Run `hamster sync` in the repository. If the message says the team doesn't match, switch with `hamster team switch --account-id <team UUID>`, then run `hamster sync` again.
+- **`ship` stops on a merge conflict.** It never resolves conflicts itself. Resolve them, commit, and run `/hamster:resume-hamster` to continue from the wave where it stopped.
+
+## Support
+
+- **Help and bug reports:** email [support@tryhamster.com](mailto:support@tryhamster.com), read the [docs](https://tryhamster.com/docs), or open an issue at [github.com/gethamster/plugin/issues](https://github.com/gethamster/plugin/issues).
+- **Security concerns:** email [support@tryhamster.com](mailto:support@tryhamster.com) instead of opening a public issue.
+- **Privacy questions:** email [privacy@tryhamster.com](mailto:privacy@tryhamster.com). The [Privacy Policy](https://tryhamster.com/privacy-policy) explains what Hamster collects, how it uses the data, and how long it keeps it.
 
 ---
 
