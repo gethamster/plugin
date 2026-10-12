@@ -4,7 +4,7 @@
  * Generate plugins/hamster/agents/*.md as native-agent projections over the
  * canonical skill-local prompt bodies under
  * plugins/hamster/skills/ship/references/agents/, and the root
- * .grok-plugin/plugin.json from plugins/hamster/plugin.json.
+ * .grok-plugin/plugin.json and package.json from plugins/hamster/plugin.json.
  *
  * Usage:
  *   node scripts/sync-adapters.mjs          # write generated files
@@ -117,7 +117,7 @@ export async function syncAdapters({ check = false } = {}) {
     written.push(path.relative(repoRoot, targetPath));
   }
 
-  await syncGrokRootManifest({ check, errors, written });
+  await syncRootManifests({ check, errors, written });
 
   return { errors, written };
 }
@@ -125,58 +125,87 @@ export async function syncAdapters({ check = false } = {}) {
 // `grok plugin install gethamster/plugin` reads a manifest at the source root
 // and never follows a marketplace catalog. This root manifest points Grok into
 // plugins/hamster, so the published command and existing installs keep
-// working. Its name, version, and description come from the plugin's own
-// plugin.json; `agents` must stay a directory string, since Grok loads no
-// agents from an array of files.
+// working. `agents` must stay a directory string, since Grok loads no agents
+// from an array of files.
 export const GROK_ROOT_MANIFEST = path.join(".grok-plugin", "plugin.json");
 
-async function syncGrokRootManifest({ check, errors, written }) {
-  const sourcePath = path.join(repoRoot, pluginDir, "plugin.json");
-  let source;
-  try {
-    source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
-  } catch (error) {
-    errors.push(`Could not read ${path.relative(repoRoot, sourcePath)} to render ${GROK_ROOT_MANIFEST}: ${error.message}`);
-    return;
-  }
+// Pi installs a git repository from its root, and the same package.json is the
+// npm package Pi's catalog lists: the catalog picks up npm packages with the
+// pi-package keyword. `files` ships only the skills; npm adds README.md,
+// LICENSE, and package.json on its own.
+const PI_PACKAGE_MANIFEST = "package.json";
+const PI_PACKAGE_NAME = "@tryhamster/pi";
+const PI_SKILLS = "plugins/hamster/skills";
 
-  const rendered = `${JSON.stringify(
-    {
+// Each root manifest takes its version and description from the plugin's own
+// plugin.json, so a plugin bump moves every client together.
+const ROOT_MANIFESTS = [
+  {
+    target: GROK_ROOT_MANIFEST,
+    render: (source) => ({
       name: source.name,
       version: source.version,
       description: source.description,
       skills: "./plugins/hamster/skills",
       agents: "./plugins/hamster/agents",
       mcpServers: "./plugins/hamster/.mcp.json",
-    },
-    null,
-    2
-  )}\n`;
+    }),
+  },
+  {
+    target: PI_PACKAGE_MANIFEST,
+    render: (source) => ({
+      name: PI_PACKAGE_NAME,
+      version: source.version,
+      description: source.description,
+      keywords: ["pi-package", ...source.keywords],
+      homepage: source.homepage,
+      repository: { type: "git", url: `git+${source.repository}.git` },
+      license: source.license,
+      author: source.author,
+      files: [PI_SKILLS],
+      pi: { skills: [`./${PI_SKILLS}`] },
+      publishConfig: { access: "public" },
+    }),
+  },
+];
 
-  const targetPath = path.join(repoRoot, GROK_ROOT_MANIFEST);
-  if (check) {
-    let existing;
-    try {
-      existing = await fs.readFile(targetPath, "utf8");
-    } catch (error) {
-      errors.push(
-        error.code === "ENOENT"
-          ? `Generated ${GROK_ROOT_MANIFEST} is missing. Run \`node scripts/sync-adapters.mjs\`.`
-          : `Could not read ${GROK_ROOT_MANIFEST}: ${error.message}`
-      );
-      return;
-    }
-    if (existing.replace(/\r\n/g, "\n") !== rendered) {
-      errors.push(
-        `${GROK_ROOT_MANIFEST} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
-      );
-    }
+async function syncRootManifests({ check, errors, written }) {
+  const sourcePath = path.join(repoRoot, pluginDir, "plugin.json");
+  let source;
+  try {
+    source = JSON.parse(await fs.readFile(sourcePath, "utf8"));
+  } catch (error) {
+    errors.push(`Could not read ${path.relative(repoRoot, sourcePath)} to render the root manifests: ${error.message}`);
     return;
   }
 
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await fs.writeFile(targetPath, rendered, "utf8");
-  written.push(GROK_ROOT_MANIFEST);
+  for (const { target, render } of ROOT_MANIFESTS) {
+    const rendered = `${JSON.stringify(render(source), null, 2)}\n`;
+    const targetPath = path.join(repoRoot, target);
+    if (check) {
+      let existing;
+      try {
+        existing = await fs.readFile(targetPath, "utf8");
+      } catch (error) {
+        errors.push(
+          error.code === "ENOENT"
+            ? `Generated ${target} is missing. Run \`node scripts/sync-adapters.mjs\`.`
+            : `Could not read ${target}: ${error.message}`
+        );
+        continue;
+      }
+      if (existing.replace(/\r\n/g, "\n") !== rendered) {
+        errors.push(
+          `${target} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
+        );
+      }
+      continue;
+    }
+
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    await fs.writeFile(targetPath, rendered, "utf8");
+    written.push(target);
+  }
 }
 
 async function main() {

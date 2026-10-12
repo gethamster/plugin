@@ -93,8 +93,10 @@ To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`
 ### Pi
 
 ```text
-pi install git:github.com/gethamster/plugin
+pi install npm:@tryhamster/pi
 ```
+
+To track the repository instead of npm releases, run `pi install git:github.com/gethamster/plugin`.
 
 Pi has no MCP support, so Hamster runs through the CLI. Run `/skill:setup` to install it and sign in.
 
@@ -227,6 +229,8 @@ Every skill directory is self-contained: no SKILL.md reads a sibling skill's fil
 `plugins/hamster/` is the plugin: every client installs this one folder, and it is the folder submitted to the Claude plugin directory, which scans only the folder it is given. It holds each client's manifest (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`, and the `plugin.json` Antigravity needs to register the MCP server), `.mcp.json` and Antigravity's `mcp_config.json`, `skills/`, `agents/`, and its own `README.md`, which lists what the plugin runs, sends, and fetches, so update it when that changes. The repository root keeps only the marketplace catalogs that point at `./plugins/hamster` (`.claude-plugin/`, which Copilot CLI also reads, `.cursor-plugin/`, and `.agents/plugins/`), the root `package.json` whose `pi.skills` points Pi at the same skills, and maintainer tooling, CI, and listing images. `validate-plugin.mjs` fails if a plugin manifest, `skills/`, or `agents/` reappears at the root, because Antigravity then installs the root and finds 0 skills, and it fails on any symbolic link or image inside `plugins/hamster/` except `.claude-plugin/icon.svg`, the Claude plugin directory's listing icon, which must stay a self-contained SVG with no raster, script, or external reference, and the three Codex listing PNGs in `assets/`, which must match the root `assets/` copies byte for byte. `build-codex-bundle.mjs` packs the root `assets/` into the OpenAI Plugins Directory zip. The Cursor logo is a URL to the root `assets/logo.svg`. That `plugin.json` must not declare the Agent Plugins `$schema`: with it, Copilot CLI reads agents only from `com.github.copilot/agents/` and registers neither worker.
 
 The one plugin manifest at the root is `.grok-plugin/plugin.json`. Grok Build's `plugin install <repo>` reads a manifest at the repository root and doesn't follow a marketplace catalog, so this file points its `skills`, `agents`, and `mcpServers` into `plugins/hamster/`. It keeps `grok plugin install gethamster/plugin --trust` working and lets existing Grok installs update onto this layout. `agents` must stay a directory path: Grok loads no agents from an array of files. `sync-adapters.mjs` writes its name, version, and description from `plugins/hamster/plugin.json`, and `validate-plugin.mjs` checks that each path resolves and that no other `<client>-plugin/plugin.json` appears at the root. Antigravity and Pi don't read `.grok-plugin/`, and the Claude plugin directory scans only `plugins/hamster/`.
+
+The root `package.json` is the Pi package. Pi installs a git repository from its root, so its `pi.skills` points Pi into `plugins/hamster/skills`, and the same file is the public npm package `@tryhamster/pi`. It carries the `pi-package` keyword, which is how Pi's package catalog finds npm packages, and its `files` ships only the skills; npm adds this README, `LICENSE`, and `package.json`. `sync-adapters.mjs` writes it from `plugins/hamster/plugin.json`, so a plugin bump is a new npm version, and `validate-plugin.mjs` fails if it drifts, turns private, loses the keyword, or stops shipping the skills. To publish a release, run `npm pack --dry-run` to check the file list, then `npm publish --access public` from the repository root.
 
 **Editing shared material is a multi-file edit.** The first path in each group below is the source of truth; the rest are copies that must stay byte-identical. Change the source, copy it over the others, then run the validator — it names the exact `cp` commands when a group has drifted.
 

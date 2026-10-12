@@ -1067,6 +1067,8 @@ async function validatePluginFolderFiles(dir = pluginDir) {
 
 // Pi installs a git repository from its root and reads skills only from a root
 // skills/ or package.json pi.skills, so without this entry it installs 0 skills.
+// The same package.json is the npm package: Pi's catalog lists only public npm
+// packages with the pi-package keyword, and `files` must ship the skills it names.
 async function validatePiPackage() {
   const manifest = await readJsonFile(path.join(repoRoot, "package.json"), "Root package.json");
   if (!manifest) {
@@ -1075,6 +1077,15 @@ async function validatePiPackage() {
   const skills = manifest.pi?.skills;
   if (!Array.isArray(skills) || skills.length !== 1 || skills[0] !== `${PLUGIN_SOURCE}/skills`) {
     addError(`Root package.json must set pi.skills to ["${PLUGIN_SOURCE}/skills"].`);
+  }
+  if (manifest.private) {
+    addError("Root package.json must not be private; it is the npm package Pi's catalog lists.");
+  }
+  if (!manifest.keywords?.includes("pi-package")) {
+    addError('Root package.json keywords must include "pi-package" for Pi\'s catalog to list it.');
+  }
+  if (!manifest.files?.includes(`${PLUGIN_PATH}/skills`)) {
+    addError(`Root package.json files must include "${PLUGIN_PATH}/skills" so the npm package ships the skills.`);
   }
 }
 

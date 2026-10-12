@@ -505,17 +505,33 @@ test("a Codex image other than the three listing PNGs fails validation", async (
   assert.match(result.stderr, /plugins\/hamster\/assets\/icon\.png must match root assets\/icon\.png byte for byte/);
 });
 
-test("a Pi manifest that stops pointing at plugins/hamster fails validation", async () => {
+test("a Pi package that drifts, goes private, or stops shipping plugins/hamster skills fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-pi-");
   await copyPackage(cwd);
   const manifestPath = path.join(cwd, "package.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  // A release that bumps plugins/hamster but not this file would reuse a
+  // version npm already has, and the catalog would keep the old skills.
+  manifest.version = "0.0.1";
+  manifest.private = true;
+  manifest.keywords = ["hamster"];
+  manifest.files = ["skills"];
   manifest.pi.skills = ["./skills"];
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /package\.json is out of sync with plugins\/hamster\/plugin\.json/);
   assert.match(result.stderr, /Root package\.json must set pi\.skills to \["\.\/plugins\/hamster\/skills"\]/);
+  assert.match(result.stderr, /Root package\.json must not be private/);
+  assert.match(result.stderr, /Root package\.json keywords must include "pi-package"/);
+  assert.match(result.stderr, /Root package\.json files must include "plugins\/hamster\/skills"/);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
+  const repaired = await runValidator(cwd);
+  assert.equal(repaired.code, 0, repaired.stderr);
 });
 
 test("a drifted duplicate fails validation", async () => {
