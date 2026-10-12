@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -431,9 +431,44 @@ test("the generated Gemini extension at the root fails validation when it drifts
   assert.equal(sync.code, 0, sync.stderr);
   const after = await runValidator(cwd);
   assert.equal(after.code, 0, after.stderr);
-  assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
+  const regenerated = JSON.parse(await readFile(manifestPath, "utf8"));
+  const mcp = JSON.parse(await readFile(plugin(cwd, ".mcp.json"), "utf8"));
+  assert.equal(regenerated.version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
+  // Gemini reads a remote HTTP server from httpUrl; `url` alone would be SSE.
+  assert.deepEqual(regenerated.mcpServers, { hamster: { httpUrl: mcp.mcpServers.hamster.url } });
   assert.doesNotMatch(await readFile(path.join(cwd, "agents", "wave-reviewer.md"), "utf8"), /^(color|model):/m);
   assert.equal(await pathExists(path.join(cwd, "agents", "extra.md")), false);
+});
+
+test("a root skills/ or agents/ linked to plugins/hamster, or a missing Gemini root, fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-gemini-links-");
+  await copyPackage(cwd);
+  // A link reads the same bytes as the source but installs nothing on clients
+  // that don't materialize symbolic links.
+  await rm(path.join(cwd, "skills"), { recursive: true });
+  await symlink(path.join("plugins", "hamster", "skills"), path.join(cwd, "skills"));
+  await rm(path.join(cwd, "agents"), { recursive: true });
+  await symlink(path.join("plugins", "hamster", "agents"), path.join(cwd, "agents"));
+
+  const linked = await runValidator(cwd);
+  assert.notEqual(linked.code, 0);
+  assert.match(linked.stderr, /skills\/ must be a generated directory, not a link/);
+  assert.match(linked.stderr, /agents\/ must be a generated directory, not a link/);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.equal((await lstat(path.join(cwd, "skills"))).isDirectory(), true);
+  assert.equal((await lstat(path.join(cwd, "agents"))).isDirectory(), true);
+  // Writing the Gemini agents must not go through the link into plugins/hamster.
+  assert.match(await readFile(plugin(cwd, "agents", "wave-reviewer.md"), "utf8"), /^color: /m);
+  assert.equal((await runValidator(cwd)).code, 0);
+
+  await rm(path.join(cwd, "skills"), { recursive: true });
+  await rm(path.join(cwd, "gemini-extension.json"));
+  const missing = await runValidator(cwd);
+  assert.notEqual(missing.code, 0);
+  assert.match(missing.stderr, /Generated skills\/ is missing/);
+  assert.match(missing.stderr, /Generated gemini-extension\.json is missing/);
 });
 
 test("a Grok root manifest that drifts or stops pointing into plugins/hamster fails validation", async () => {

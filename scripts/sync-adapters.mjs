@@ -65,6 +65,10 @@ function digest(text) {
 export async function syncAdapters({ check = false } = {}) {
   const errors = [];
   const written = [];
+  const removed = [];
+
+  // Runs first so a write never lands through a link into plugins/hamster.
+  await syncGeminiAgentsDir({ check, errors, removed });
 
   for (const agent of AGENTS) {
     const sourcePath = path.join(repoRoot, pluginDir, "skills", "ship", "references", "agents", `${agent.id}.md`);
@@ -109,9 +113,8 @@ export async function syncAdapters({ check = false } = {}) {
   await syncGrokRootManifest({ check, errors, written });
   await syncGeminiExtension({ check, errors, written });
   await syncGeminiSkills({ check, errors, written });
-  await removeStrayGeminiAgents({ check, errors });
 
-  return { errors, written };
+  return { errors, written, removed };
 }
 
 // `grok plugin install gethamster/plugin` reads a manifest at the source root
@@ -244,9 +247,9 @@ async function syncGeminiExtension({ check, errors, written }) {
   });
 }
 
-// Maps each regular file under `dir` to its bytes and executable bit, keyed by
-// its path relative to `dir`. Anything else (a symbolic link) is listed under
-// `others` so a copy cannot pass as a link to the source.
+// Maps each regular file under `dir` to the digest of its bytes and its
+// executable bit, keyed by its path relative to `dir`. Anything else, such as a
+// symbolic link, goes in `others` so a link to the source cannot pass as a copy.
 async function readTree(dir, base = dir, files = new Map(), others = []) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
     const entryPath = path.join(dir, entry.name);
@@ -276,6 +279,10 @@ async function syncGeminiSkills({ check, errors, written }) {
 
   let target;
   try {
+    if (!(await isRealDirectory(targetPath))) {
+      errors.push(`${GEMINI_SKILLS_DIR}/ must be a generated directory, not a link. Run \`node scripts/sync-adapters.mjs\`.`);
+      return;
+    }
     target = await readTree(targetPath);
   } catch (error) {
     errors.push(
@@ -306,32 +313,51 @@ async function syncGeminiSkills({ check, errors, written }) {
   }
 }
 
-// Gemini and agy load every file in the root agents/, so it holds only the
-// generated agents.
-async function removeStrayGeminiAgents({ check, errors }) {
-  const expected = new Set(AGENTS.map((agent) => `${agent.id}.md`));
+// readdir follows a symbolic link, so only lstat tells a generated directory
+// from a link to the source. Throws ENOENT when the path is missing.
+async function isRealDirectory(targetPath) {
+  return (await fs.lstat(targetPath)).isDirectory();
+}
+
+// Gemini and agy load every file in the root agents/, so it is a real
+// directory that holds only the generated agents. A missing directory is left
+// to the agent loop, which reports or writes each file.
+async function syncGeminiAgentsDir({ check, errors, removed }) {
+  const dirPath = path.join(repoRoot, GEMINI_AGENTS_DIR);
   let entries;
   try {
-    entries = await fs.readdir(path.join(repoRoot, GEMINI_AGENTS_DIR));
+    if (!(await isRealDirectory(dirPath))) {
+      if (check) {
+        errors.push(`${GEMINI_AGENTS_DIR}/ must be a generated directory, not a link. Run \`node scripts/sync-adapters.mjs\`.`);
+      } else {
+        await fs.rm(dirPath, { force: true });
+        removed.push(GEMINI_AGENTS_DIR);
+      }
+      return;
+    }
+    entries = await fs.readdir(dirPath);
   } catch (error) {
     if (error.code === "ENOENT") {
       return;
     }
     throw error;
   }
+
+  const expected = new Set(AGENTS.map((agent) => `${agent.id}.md`));
   for (const name of entries.filter((entry) => !expected.has(entry))) {
     const stray = path.join(GEMINI_AGENTS_DIR, name);
     if (check) {
       errors.push(`${stray} is not a generated agent. Run \`node scripts/sync-adapters.mjs\`.`);
     } else {
       await fs.rm(path.join(repoRoot, stray), { recursive: true, force: true });
+      removed.push(stray);
     }
   }
 }
 
 async function main() {
   const check = process.argv.includes("--check");
-  const { errors, written } = await syncAdapters({ check });
+  const { errors, written, removed } = await syncAdapters({ check });
 
   if (errors.length > 0) {
     console.error(check ? "Adapter check failed:" : "Adapter sync failed:");
@@ -346,6 +372,9 @@ async function main() {
     return;
   }
 
+  for (const file of removed) {
+    console.log(`Removed ${file}`);
+  }
   for (const file of written) {
     console.log(`Wrote ${file}`);
   }
