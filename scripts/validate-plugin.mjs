@@ -935,20 +935,19 @@ async function validateLayout() {
   await validateAgents(pluginDir, "hamster");
 }
 
-// A plugin manifest or component at the repository root turns clients back to
-// a root install: agy then skips plugins/ and installs 0 skills while still
-// reporting [ok].
+// The root holds the Gemini extension: gemini-extension.json, skills/, and
+// agents/, which sync-adapters.mjs generates from plugins/hamster and checks for
+// drift. agy installs that root as one plugin, so it gets all of those skills
+// and agents. Any other plugin manifest or component at the root would change
+// what agy or another client installs, so these stay in plugins/hamster.
 const ROOT_PLUGIN_ENTRIES = [
   "plugin.json",
-  "gemini-extension.json",
   ".claude-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
   ".codex-plugin",
   ".mcp.json",
   "mcp.json",
   "mcp_config.json",
-  "skills",
-  "agents",
   "com.github.copilot",
 ];
 
