@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,9 @@ const PACKAGE_ENTRIES = [
   ".cursor-plugin",
   ".claude-plugin",
   ".grok-plugin",
+  "gemini-extension.json",
+  "skills",
+  "agents",
   ".agents",
   "assets",
   "scripts",
@@ -390,14 +393,82 @@ test("a plugin description that drifts from its siblings fails validation", asyn
 test("a plugin manifest left at the repository root fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-root-manifest-");
   await copyPackage(cwd);
-  // agy installs 0 skills, and still reports [ok], when the root has one.
+  // agy installs a root that holds a manifest, so another client's manifest or
+  // MCP config there changes what agy installs.
   await cp(plugin(cwd, "plugin.json"), path.join(cwd, "plugin.json"));
-  await cp(plugin(cwd, "skills"), path.join(cwd, "skills"), { recursive: true });
+  await cp(plugin(cwd, "mcp_config.json"), path.join(cwd, "mcp_config.json"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /plugin\.json must not exist at the repository root/);
-  assert.match(result.stderr, /skills must not exist at the repository root/);
+  assert.match(result.stderr, /mcp_config\.json must not exist at the repository root/);
+});
+
+test("the generated Gemini extension at the root fails validation when it drifts from plugins/hamster", async () => {
+  const cwd = await makeTemp("hamster-plugin-gemini-root-");
+  await copyPackage(cwd);
+  const manifestPath = path.join(cwd, "gemini-extension.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.version = "0.0.1";
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(path.join(cwd, "skills", "setup", "SKILL.md"), "edited at the root\n");
+  await writeFile(path.join(cwd, "skills", "stray.md"), "not in plugins/hamster\n");
+  await chmod(path.join(cwd, "skills", "ship", "scripts", "ensure-ready.sh"), 0o644);
+  // Gemini rejects `color` in agent frontmatter, so the root agents leave it out.
+  await cp(plugin(cwd, "agents", "wave-reviewer.md"), path.join(cwd, "agents", "wave-reviewer.md"));
+  await writeFile(path.join(cwd, "agents", "extra.md"), "---\nname: extra\n---\n");
+
+  const result = await runValidator(cwd);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stderr, /gemini-extension\.json is out of sync with plugins\/hamster\/plugin\.json/);
+  assert.match(result.stderr, /skills\/setup\/SKILL\.md is out of sync with plugins\/hamster\/skills\//);
+  assert.match(result.stderr, /skills\/stray\.md is out of sync with plugins\/hamster\/skills\//);
+  assert.match(result.stderr, /skills\/ship\/scripts\/ensure-ready\.sh is out of sync with plugins\/hamster\/skills\//);
+  assert.match(result.stderr, /agents\/wave-reviewer\.md is out of sync/);
+  assert.match(result.stderr, /agents\/extra\.md is not a generated agent/);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  const after = await runValidator(cwd);
+  assert.equal(after.code, 0, after.stderr);
+  const regenerated = JSON.parse(await readFile(manifestPath, "utf8"));
+  const mcp = JSON.parse(await readFile(plugin(cwd, ".mcp.json"), "utf8"));
+  assert.equal(regenerated.version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
+  // Gemini reads a remote HTTP server from httpUrl; `url` alone would be SSE.
+  assert.deepEqual(regenerated.mcpServers, { hamster: { httpUrl: mcp.mcpServers.hamster.url } });
+  assert.doesNotMatch(await readFile(path.join(cwd, "agents", "wave-reviewer.md"), "utf8"), /^(color|model):/m);
+  assert.equal(await pathExists(path.join(cwd, "agents", "extra.md")), false);
+});
+
+test("a root skills/ or agents/ linked to plugins/hamster, or a missing Gemini root, fails validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-gemini-links-");
+  await copyPackage(cwd);
+  // A link reads the same bytes as the source but installs nothing on clients
+  // that don't materialize symbolic links.
+  await rm(path.join(cwd, "skills"), { recursive: true });
+  await symlink(path.join("plugins", "hamster", "skills"), path.join(cwd, "skills"));
+  await rm(path.join(cwd, "agents"), { recursive: true });
+  await symlink(path.join("plugins", "hamster", "agents"), path.join(cwd, "agents"));
+
+  const linked = await runValidator(cwd);
+  assert.notEqual(linked.code, 0);
+  assert.match(linked.stderr, /skills\/ must be a generated directory, not a link/);
+  assert.match(linked.stderr, /agents\/ must be a generated directory, not a link/);
+
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
+  assert.equal((await lstat(path.join(cwd, "skills"))).isDirectory(), true);
+  assert.equal((await lstat(path.join(cwd, "agents"))).isDirectory(), true);
+  // Writing the Gemini agents must not go through the link into plugins/hamster.
+  assert.match(await readFile(plugin(cwd, "agents", "wave-reviewer.md"), "utf8"), /^color: /m);
+  assert.equal((await runValidator(cwd)).code, 0);
+
+  await rm(path.join(cwd, "skills"), { recursive: true });
+  await rm(path.join(cwd, "gemini-extension.json"));
+  const missing = await runValidator(cwd);
+  assert.notEqual(missing.code, 0);
+  assert.match(missing.stderr, /Generated skills\/ is missing/);
+  assert.match(missing.stderr, /Generated gemini-extension\.json is missing/);
 });
 
 test("a Grok root manifest that drifts or stops pointing into plugins/hamster fails validation", async () => {
@@ -613,6 +684,10 @@ test("an uncommitted bundle source stops the build", async () => {
   await commitPackage(cwd);
   const skillPath = plugin(cwd, "skills", "ship", "SKILL.md");
   await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
+  // Regenerate the root copy so the edit passes validation and only the dirty
+  // checkout stops the build.
+  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
+  assert.equal(sync.code, 0, sync.stderr);
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);

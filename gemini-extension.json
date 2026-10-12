@@ -1,0 +1,10 @@
+{
+  "name": "hamster",
+  "version": "3.4.10",
+  "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
+  "mcpServers": {
+    "hamster": {
+      "httpUrl": "https://tryhamster.com/mcp"
+    }
+  }
+}
