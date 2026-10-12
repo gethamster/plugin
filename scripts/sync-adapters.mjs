@@ -189,31 +189,14 @@ async function syncRootManifests({ check, errors, written }) {
       errors.push(`${path.relative(repoRoot, sourcePath)} keywords must be an array to render ${target}.`);
       continue;
     }
-    const rendered = `${JSON.stringify(render(source), null, 2)}\n`;
-    const targetPath = path.join(repoRoot, target);
-    if (check) {
-      let existing;
-      try {
-        existing = await fs.readFile(targetPath, "utf8");
-      } catch (error) {
-        errors.push(
-          error.code === "ENOENT"
-            ? `Generated ${target} is missing. Run \`node scripts/sync-adapters.mjs\`.`
-            : `Could not read ${target}: ${error.message}`
-        );
-        continue;
-      }
-      if (existing.replace(/\r\n/g, "\n") !== rendered) {
-        errors.push(
-          `${target} is out of sync with ${path.relative(repoRoot, sourcePath)}. Run \`node scripts/sync-adapters.mjs\`.`
-        );
-      }
-      continue;
-    }
-
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    await fs.writeFile(targetPath, rendered, "utf8");
-    written.push(target);
+    await syncGeneratedFile({
+      check,
+      errors,
+      written,
+      target,
+      rendered: `${JSON.stringify(render(source), null, 2)}\n`,
+      source: path.relative(repoRoot, sourcePath),
+    });
   }
 }
 
