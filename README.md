@@ -85,8 +85,10 @@ To sign in to the hosted MCP server, run `/mcp auth hamster`.
 ### Gemini CLI
 
 ```text
-gemini extensions install https://github.com/gethamster/plugin
+gemini extensions install https://github.com/gethamster/plugin --ref main
 ```
+
+Once the next GitHub release of `gethamster/plugin` is out, `gemini extensions install https://github.com/gethamster/plugin` works too.
 
 To sign in to the hosted MCP server, run `/mcp auth hamster`.
 
@@ -243,7 +245,7 @@ Every skill directory is self-contained: no SKILL.md reads a sibling skill's fil
 
 Besides the generated `gemini-extension.json`, the one plugin manifest at the root is `.grok-plugin/plugin.json`. Grok Build's `plugin install <repo>` reads a manifest at the repository root and doesn't follow a marketplace catalog, so this file points its `skills`, `agents`, and `mcpServers` into `plugins/hamster/`. It keeps `grok plugin install gethamster/plugin --trust` working and lets existing Grok installs update onto this layout. `agents` must stay a directory path: Grok loads no agents from an array of files. `sync-adapters.mjs` writes its name, version, and description from `plugins/hamster/plugin.json`, and `validate-plugin.mjs` checks that each path resolves and that no other `<client>-plugin/plugin.json` appears at the root. Antigravity and Pi don't read `.grok-plugin/`, and the Claude plugin directory scans only `plugins/hamster/`.
 
-**Don't edit the root `skills/`, `agents/`, or `gemini-extension.json`.** They are the Gemini CLI extension, and `sync-adapters.mjs` generates them from `plugins/hamster/`: `skills/` is an exact copy, `agents/` leaves out the `color` line Gemini rejects and the `model` line Gemini would read as a Gemini model name, and `gemini-extension.json` takes its name, version, and description from `plugins/hamster/plugin.json` and the hosted MCP URL from `plugins/hamster/.mcp.json`. The Gemini CLI extensions gallery lists repositories with that manifest at the root, and Gemini loads skills and agents only from beside it. Antigravity installs the same root and gets the same 8 skills, 2 agents, and MCP server. Edit `plugins/hamster/`, run `node scripts/sync-adapters.mjs`, and commit both; `--check` and the validator fail when the root copies drift.
+**Don't edit the root `skills/`, `agents/`, or `gemini-extension.json`.** They are the Gemini CLI extension, and `sync-adapters.mjs` generates them from `plugins/hamster/`: `skills/` is an exact copy, `agents/` leaves out the `color` line Gemini rejects and the `model` line Gemini would read as a Gemini model name, and `gemini-extension.json` takes its name, version, and description from `plugins/hamster/plugin.json` and the hosted MCP URL from `plugins/hamster/.mcp.json`. The Gemini CLI extensions gallery lists repositories with that manifest at the root, and Gemini loads skills and agents only from beside it. The copies can't be links, because Gemini's install copy rewrites a link to its absolute source path, which is deleted after install. Antigravity installs the same root because that manifest is there, so the root `agents/` is what keeps its 2 agents; it gets the same 8 skills, 2 agents, and MCP server. Edit `plugins/hamster/`, run `node scripts/sync-adapters.mjs`, and commit both; `--check` and the validator fail when the root copies drift.
 
 The root `package.json` is the Pi package. Pi installs a git repository from its root, so its `pi.skills` points Pi into `plugins/hamster/skills`, and the same file is the public npm package `@tryhamster/pi`. It carries the `pi-package` keyword, which is how Pi's package catalog finds npm packages, and its `files` ships only the skills; npm adds this README, `LICENSE`, and `package.json`. `sync-adapters.mjs` writes it from `plugins/hamster/plugin.json`, so a plugin bump is a new npm version, and `validate-plugin.mjs` fails if it drifts, turns private, loses the keyword, or stops shipping the skills. To publish a release, run `npm pack --dry-run` to check the file list, then `npm publish --access public` from the repository root.
 
