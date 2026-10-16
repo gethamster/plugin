@@ -20,8 +20,8 @@
   ],
   "interface": {
     "displayName": "Hamster",
-    "shortDescription": "Write briefs, align, and ship",
-    "longDescription": "Use Hamster to write briefs and PRDs as a team, align, then let agents ship them.",
+    "shortDescription": "Ask Hamster and ship briefs",
+    "longDescription": "Use Hamster to write PRDs, specs, and briefs as a team, then plan and ship them.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
