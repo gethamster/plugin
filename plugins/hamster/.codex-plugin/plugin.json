@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Hamster",
     "shortDescription": "Ask Hamster and ship briefs",
-    "longDescription": "Ask Hamster what your team is building, why decisions were made, and what needs attention, or have it make changes in your workspace. Connect to your workspace through Hamster's hosted MCP server. In Codex, the coding skills build, test, and review code from existing Briefs and Plans, with your approval before opening a pull request. Coding skills need access to your repository and a shell.",
+    "longDescription": "Use Hamster to write PRDs, specs, and briefs as a team, then plan and ship them.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
