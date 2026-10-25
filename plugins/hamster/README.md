@@ -13,6 +13,18 @@ Hamster is an AI-native product planning workspace. This plugin connects Claude 
 
 Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selecting `plugin:hamster:hamster`.
 
+## Use with OpenCode
+
+OpenCode installs the skills and the hosted MCP server in two steps. Run both in your project:
+
+```text
+npx skills add gethamster/plugin --agent opencode
+opencode mcp add hamster --url https://tryhamster.com/mcp
+opencode mcp auth hamster
+```
+
+The first command copies the eight skills into `.agents/skills/`; you can also copy this folder's `skills/*` there yourself. OpenCode also reads `.opencode/skills/` and `.claude/skills/`. The second command works on OpenCode 1 and 2. OpenCode 1 writes the server to `~/.config/opencode/opencode.jsonc`, and OpenCode 2 writes it to the project's `opencode.json` (add `--global` for `~/.config/opencode`). The third command opens your browser to sign in; OpenCode owns the sign-in, and nothing here reads your token. OpenCode has no `/hamster:<skill>` commands, so ask for a skill by name, for example "use the setup skill". See the [repository README](https://github.com/gethamster/plugin#opencode) for the config shapes.
+
 ## Skills
 
 | Skill | What it does |
