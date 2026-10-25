@@ -15,7 +15,7 @@ Then run `/hamster:setup`, and sign in to the MCP server from `/mcp` by selectin
 
 ## Use with OpenCode
 
-OpenCode installs the skills and the hosted MCP server in two steps. Run both in your project:
+OpenCode installs the skills and the hosted MCP server in two steps. Run these in your project folder. The skills install into the project, and where the MCP server is saved depends on your OpenCode version, as described below:
 
 ```text
 npx skills add gethamster/plugin --agent opencode
@@ -23,7 +23,7 @@ opencode mcp add hamster --url https://tryhamster.com/mcp
 opencode mcp auth hamster
 ```
 
-The first command copies the eight skills into `.agents/skills/`; you can also copy this folder's `skills/*` there yourself. OpenCode also reads `.opencode/skills/` and `.claude/skills/`. The second command works on OpenCode 1 and 2. OpenCode 1 writes the server to `~/.config/opencode/opencode.jsonc`, and OpenCode 2 writes it to the project's `opencode.json` (add `--global` for `~/.config/opencode`). The third command opens your browser to sign in; OpenCode owns the sign-in, and nothing here reads your token. OpenCode has no `/hamster:<skill>` commands, so ask for a skill by name, for example "use the setup skill". See the [repository README](https://github.com/gethamster/plugin#opencode) for the config shapes.
+The first command copies the eight skills into `.agents/skills/`; you can also copy this folder's `skills/*` there yourself. OpenCode also reads `.opencode/skills/` and `.claude/skills/`. The second command works on OpenCode 1.17.0 or later and on OpenCode 2. OpenCode 1 writes the server to the global config in `~/.config/opencode/` (`opencode.json` or `opencode.jsonc`, whichever exists), and OpenCode 2 writes it to the project's `opencode.json` (add `--global` for `~/.config/opencode`). The third command opens your browser to sign in; OpenCode owns the sign-in, and nothing here reads your token. OpenCode has no `/hamster:<skill>` commands, so ask for a skill by name, for example "use the setup skill". See the [repository README](https://github.com/gethamster/plugin#opencode) for the config shapes.
 
 ## Skills
 
