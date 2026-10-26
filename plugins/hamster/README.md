@@ -47,6 +47,27 @@ Run `/hamster:setup` first. These prompts work against any Hamster workspace tha
 
 Nothing runs automatically when a session starts: the plugin has no hooks.
 
+## Testing Hamster
+
+A quick end-to-end check that uses a Hamster workspace with at least one brief that has tasks.
+
+1. **Install.** Pick one client:
+   - **Grok Bot:** import the plugin in Cursor (below). Hamster then appears in Grok Bot's Connect apps under Team plugins; select Add. For the tools without the skills, send a Bot `Add this MCP server: https://tryhamster.com/mcp` instead.
+   - **Cursor:** open Customize → Add Marketplace → Import from GitHub, paste `https://github.com/gethamster/plugin` at User scope, select Import, then open the Personal tab and select Add next to Hamster.
+   - **Claude Code:** run the two commands under [Install](#install).
+2. **Sign in.** Start the client's sign-in for the Hamster MCP server: in Grok Bot, Add or Reconnect on the Hamster card; in Cursor, follow Cursor's sign-in prompt for Hamster; in Claude Code, open `/mcp` and select `plugin:hamster:hamster`. Sign in at tryhamster.com and select Authorize. The client then lists Hamster's tools.
+3. **Try three prompts:**
+
+   | Prompt | Expected result |
+   |---|---|
+   | `List my Hamster briefs.` | The workspace's briefs, with titles and status. Read only. |
+   | `Show the tasks for the most recently updated brief.` | That brief's tasks and their status. Read only. |
+   | `Add a task called "Review copy" to that brief.` | Hamster creates the task in that brief and links to it. Some clients ask you to approve the write first. |
+
+Delivering a brief as a pull request (`trigger_delivery`, or `/hamster:ship`) also needs a code host connected to the workspace in Hamster Studio, such as GitHub, GitLab, or Cursor Origin. The three prompts above don't.
+
+Questions or failures: email [support@tryhamster.com](mailto:support@tryhamster.com).
+
 ## Troubleshooting
 
 - **A skill prints `SETUP_NEEDED`.** Run `/hamster:setup`. It installs the CLI if it is missing, signs you in, and syncs. If it still prints `SETUP_NEEDED`, it shows the error from `hamster status` or `hamster sync`.
