@@ -71,7 +71,7 @@ agy plugin install https://github.com/gethamster/plugin/plugins/hamster
 
 In the Antigravity app (2.15 or newer), authenticate `hamster_hamster` under Settings → Customizations → Installed MCP Servers. The plugin registers that server itself, so a manual `hamster` entry in `mcp_config.json` would add a second copy of every tool.
 
-Using GitHub Copilot CLI, Gemini CLI, Grok Build, or Pi? See [More install options](#more-install-options).
+Using GitHub Copilot CLI, Gemini CLI, Grok Build, OpenCode, or Pi? See [More install options](#more-install-options).
 
 ## More install options
 
@@ -100,6 +100,19 @@ grok plugin install gethamster/plugin --trust
 
 To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`.
 
+### OpenCode
+
+OpenCode takes the skills and the hosted MCP server in two steps. Run these in your project folder:
+
+```text
+npx skills add gethamster/plugin --agent opencode
+opencode mcp add hamster --url https://tryhamster.com/mcp
+```
+
+Add `--global` to `npx skills add` to install into `~/.agents/skills/` instead of the current project (`opencode mcp add --url` needs OpenCode 1.17.0 or later).
+
+To sign in to the hosted MCP server, run `opencode mcp auth hamster`.
+
 ### Pi
 
 ```text
@@ -123,7 +136,7 @@ pi mcp login hamster
 
 ## Skills
 
-Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. The table uses the Claude form.
+Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. In OpenCode, ask for one by name, or in OpenCode 2 mention it as `@setup`. The table uses the Claude form.
 
 | Skill | Persona | Description |
 |-------|---------|-------------|
