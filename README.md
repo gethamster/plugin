@@ -109,9 +109,9 @@ npx skills add gethamster/plugin --agent opencode
 opencode mcp add hamster --url https://tryhamster.com/mcp
 ```
 
-Add `--global` to `npx skills add` to install the skills into `~/.agents/skills/` instead of the current project; in OpenCode 2, add it to `opencode mcp add` too to save the server in `~/.config/opencode/`. `opencode mcp add --url` needs OpenCode 1.17.0 or later.
+Add `--global` to `npx skills add` to install into `~/.agents/skills/` instead of the current project (`opencode mcp add --url` needs OpenCode 1.17.0 or later).
 
-To sign in to the hosted MCP server, run `opencode mcp auth hamster`; in OpenCode 2 you can also open `/mcps`, select hamster, and sign in.
+To sign in to the hosted MCP server, run `opencode mcp auth hamster`.
 
 ### Pi
 
