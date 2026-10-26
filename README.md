@@ -136,7 +136,7 @@ pi mcp login hamster
 
 ## Skills
 
-Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. In OpenCode, ask for one by name; OpenCode 1 also runs them as `/<skill>`, and OpenCode 2 takes `@<skill>`. The table uses the Claude form.
+Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. In OpenCode, ask for one by name, or in OpenCode 2 mention it as `@setup`. The table uses the Claude form.
 
 | Skill | Persona | Description |
 |-------|---------|-------------|
