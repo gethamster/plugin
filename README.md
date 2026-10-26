@@ -109,37 +109,11 @@ npx skills add gethamster/plugin --agent opencode
 opencode mcp add hamster --url https://tryhamster.com/mcp
 ```
 
-The first command copies the eight skills into `.agents/skills/` and records them in `skills-lock.json`. Add `--global` to install them into `~/.agents/skills/` instead. To install by hand, copy `plugins/hamster/skills/*` from this repository into `.agents/skills/`. OpenCode also reads `.opencode/skills/` and `.claude/skills/`, where `hamster sync` writes the `hamster-project-context` skill.
+Add `--global` to install into `~/.agents/skills/` and `~/.config/opencode/` instead of the current project (`opencode mcp add --url` needs OpenCode 1.17.0 or later).
 
-Where the second command saves the server depends on your OpenCode version. OpenCode 1 saves the MCP server globally, in `~/.config/opencode/opencode.json` (or `opencode.jsonc` if only that exists). OpenCode 2 saves it in the project's `opencode.json`, and `--global` saves it in the global config in `~/.config/opencode/`. If you edit the config by hand, the entry looks like this:
+To sign in to the hosted MCP server, run `opencode mcp auth hamster`, or open `/mcps`, select hamster, and sign in.
 
-OpenCode 1:
-
-```json
-{
-  "mcp": {
-    "hamster": { "type": "remote", "url": "https://tryhamster.com/mcp" }
-  }
-}
-```
-
-OpenCode 2:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "hamster": { "type": "remote", "url": "https://tryhamster.com/mcp" }
-    }
-  }
-}
-```
-
-`opencode mcp add` rejects `--url`? It needs OpenCode 1.17.0 or later.
-
-To sign in to the hosted MCP server, run `opencode mcp auth hamster`. It opens your browser. In OpenCode 2 you can also open `/mcps`, select hamster, and sign in there. `opencode mcp list` reports `needs authentication` until you do.
-
-OpenCode has no slash command for skills, so ask for one by name, or in OpenCode 2 mention it as `@setup`.
+OpenCode has no slash command for skills, so ask for one by name or mention it as `@setup`.
 
 ### Pi
 
@@ -164,7 +138,7 @@ pi mcp login hamster
 
 ## Skills
 
-Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. OpenCode has no slash command for skills, so ask for one by name, or in OpenCode 2 mention it as `@setup`. The table uses the Claude form.
+Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. OpenCode has no slash command for skills, so ask for one by name or mention it as `@setup`. The table uses the Claude form.
 
 | Skill | Persona | Description |
 |-------|---------|-------------|

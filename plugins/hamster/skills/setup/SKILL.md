@@ -66,7 +66,7 @@ When the check prints `READY`, confirm this repo now has `.hamster/`. If the cli
 - Grok Build: open `/mcps`, select `hamster`, and press `i`.
 - Cursor: follow Cursor's Hamster sign-in prompt.
 - Antigravity: in the CLI, open `/mcp`, select `hamster_hamster`, then Authenticate; in the app, select Authenticate on `hamster_hamster` under Settings → Customizations → Installed MCP Servers.
-- OpenCode: run `opencode mcp auth hamster` in a terminal; in OpenCode 2 you can also open `/mcps`, select `hamster`, and sign in.
+- OpenCode: run `opencode mcp auth hamster` in a terminal, or open `/mcps`, select `hamster`, and sign in.
 - Pi: run `pi mcp login hamster` in a terminal.
 
 If the client has no Hamster MCP server, `ask-hamster` still works through the CLI. To add the Hamster tools, tell the user to add `https://tryhamster.com/mcp` as a remote MCP connector and sign in through OAuth. In these clients, that is two commands in a terminal:
