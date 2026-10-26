@@ -111,7 +111,7 @@ opencode mcp add hamster --url https://tryhamster.com/mcp
 
 The first command copies the eight skills into `.agents/skills/` and records them in `skills-lock.json`. Add `--global` to install them into `~/.agents/skills/` instead. To install by hand, copy `plugins/hamster/skills/*` from this repository into `.agents/skills/`. OpenCode also reads `.opencode/skills/` and `.claude/skills/`, where `hamster sync` writes the `hamster-project-context` skill.
 
-Where the second command saves the server depends on your OpenCode version. OpenCode 1 saves the MCP Server globally, in `~/.config/opencode/opencode.json` (or `opencode.jsonc` if only that exists). OpenCode 2 saves it in the project's `opencode.json`, and `--global` saves it in the global config in `~/.config/opencode/`. If you edit the config by hand, the entry looks like this:
+Where the second command saves the server depends on your OpenCode version. OpenCode 1 saves the MCP server globally, in `~/.config/opencode/opencode.json` (or `opencode.jsonc` if only that exists). OpenCode 2 saves it in the project's `opencode.json`, and `--global` saves it in the global config in `~/.config/opencode/`. If you edit the config by hand, the entry looks like this:
 
 OpenCode 1:
 
