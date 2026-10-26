@@ -102,16 +102,16 @@ To sign in to the hosted MCP server, open `/mcps`, select hamster, and press `i`
 
 ### OpenCode
 
-OpenCode takes the skills and the hosted MCP server in two steps. Run these in your project folder. The skills install into the project, and where the MCP server is saved depends on your OpenCode version, as described below:
+OpenCode takes the skills and the hosted MCP server in two steps. Run these in your project folder:
 
 ```text
 npx skills add gethamster/plugin --agent opencode
 opencode mcp add hamster --url https://tryhamster.com/mcp
 ```
 
-The first command copies the eight skills into `.agents/skills/` and records them in `skills-lock.json`. Add `--global` to install them into `~/.agents/skills/` instead. To install by hand, copy `plugins/hamster/skills/*` from this repository into `.agents/skills/`. OpenCode also reads `.opencode/skills/` and `.claude/skills/`, which includes the `hamster-project-context` skill that `hamster sync` writes.
+The first command copies the eight skills into `.agents/skills/` and records them in `skills-lock.json`. Add `--global` to install them into `~/.agents/skills/` instead. To install by hand, copy `plugins/hamster/skills/*` from this repository into `.agents/skills/`. OpenCode also reads `.opencode/skills/` and `.claude/skills/`, where `hamster sync` writes the `hamster-project-context` skill.
 
-The second command works on OpenCode 1.17.0 or later and on OpenCode 2, but the two versions save the server in different places. OpenCode 1 adds it to the global config in `~/.config/opencode/`, in `opencode.json` or `opencode.jsonc`, whichever exists. OpenCode 2 adds it to the project's `opencode.json`; pass `--global` to write `~/.config/opencode` instead. To edit the config by hand, the entry looks like this.
+Where the second command saves the server depends on your OpenCode version. OpenCode 1 saves the MCP Server globally, in `~/.config/opencode/opencode.json` (or `opencode.jsonc` if only that exists). OpenCode 2 saves it in the project's `opencode.json`, and `--global` saves it in the global config in `~/.config/opencode/`. If you edit the config by hand, the entry looks like this:
 
 OpenCode 1:
 
@@ -135,9 +135,11 @@ OpenCode 2:
 }
 ```
 
+`opencode mcp add` rejects `--url`? It needs OpenCode 1.17.0 or later.
+
 To sign in to the hosted MCP server, run `opencode mcp auth hamster`. It opens your browser. In OpenCode 2 you can also open `/mcps`, select hamster, and sign in there. `opencode mcp list` reports `needs authentication` until you do.
 
-In a session, name the skill you want, for example "use the setup skill". In OpenCode 2 you can also mention it as `@setup`.
+OpenCode has no slash command for skills, so ask for one by name, or in OpenCode 2 mention it as `@setup`.
 
 ### Pi
 
@@ -162,7 +164,7 @@ pi mcp login hamster
 
 ## Skills
 
-Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. OpenCode has no slash form: it loads skills through its `skill` tool, so ask for one by name. The table uses the Claude form.
+Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. OpenCode has no slash command for skills, so ask for one by name, or in OpenCode 2 mention it as `@setup`. The table uses the Claude form.
 
 | Skill | Persona | Description |
 |-------|---------|-------------|
