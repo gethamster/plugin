@@ -49,6 +49,8 @@ First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matchi
 
 ```bash
 arg="$ARGUMENTS"; arg="${arg%/}"
+paren_id=$(printf '%s' "$arg" | grep -oiE '\([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)' | tail -1 | tr -d '()' | tr 'A-F' 'a-f')
+[ -n "$paren_id" ] && arg="$paren_id"
 if echo "$arg" | grep -qE '^https?://'; then
   identifier=$(echo "$arg" | sed -E 's|^https?://[^/]+/home/[^/]+/briefs/([^/]+)(/tasks)?$|\1|')
 else identifier="$arg"; fi
