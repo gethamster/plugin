@@ -45,7 +45,7 @@ Remember the literal `ACCOUNT_RESOLVED` value as the filesystem `$account`. Each
 
 ### If argument provided
 
-First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matching. Set `arg` to the brief's URL, UUID, or slug taken from the argument (for `Title (uuid)`, the UUID); a title alongside it is context only, used for title matching only when no identifier is present:
+First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matching. The argument may include a title alongside the brief's URL, UUID, or slug, so work out which part identifies the brief and set `arg` to that; treat any title as context, used for title matching only when no identifier is present:
 
 ```bash
 arg="$ARGUMENTS"; arg="${arg%/}"
