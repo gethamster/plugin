@@ -45,13 +45,15 @@ Remember the literal `ACCOUNT_RESOLVED` value as the filesystem `$account`. Each
 
 ### If argument provided
 
-First resolve URL/UUID/slug; a `FOUND` result takes precedence over title matching:
+First resolve URL/UUID/slug, or `Title (uuid)`, where the UUID in the trailing parentheses is the brief and the title is only context; a `FOUND` result takes precedence over title matching:
 
 ```bash
 arg="$ARGUMENTS"; arg="${arg%/}"
 if echo "$arg" | grep -qE '^https?://'; then
   identifier=$(echo "$arg" | sed -E 's|^https?://[^/]+/home/[^/]+/briefs/([^/]+)(/tasks)?$|\1|')
 else identifier="$arg"; fi
+paren=$(printf '%s\n' "$identifier" | head -n 1 | grep -oE '\([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\)[.]?[[:space:]]*$' | tr -d '(). \t')
+[ -z "$paren" ] || identifier="$paren"
 if echo "$identifier" | grep -qE '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
   slug=""
   for brief_dir in .hamster/${account}/briefs/*/; do
