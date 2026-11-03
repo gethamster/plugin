@@ -2,9 +2,9 @@
 
 **Connect your agent to Supabuild.** One plugin: ask the Discovery agent, read your team's knowledge, and follow delivery threads over remote MCP.
 
-Supabuild is a team workspace where agents turn conversation into delivered software. A Discovery agent works in the team's persistent workspace: it researches, drafts and proposes team knowledge, and starts delivery threads. Team knowledge is the team's decisions, scopes, methods and goals, each marked accepted, proposed or historical; only a person accepts a proposal, in the web app. Each delivery thread runs coding agents in an isolated sandbox against a connected project and carries the work from clarified requirements to committed changes, validation, a preview, and a verified deployment.
+Supabuild is a team workspace where agents turn conversation into delivered software. A Discovery agent works in the team's persistent workspace: it researches, drafts and proposes team knowledge, and starts delivery threads. Team knowledge is the team's published guidance, in whatever document types the team uses, each marked accepted, proposed or historical; only a person accepts a proposal, in the web app. Each delivery thread runs coding agents in an isolated sandbox against a connected project and carries the work from clarified requirements to committed changes, validation, a preview, and a verified deployment.
 
-This plugin registers Supabuild's remote MCP server (Streamable HTTP) and adds a sign-in skill. You sign in with OAuth in your client; the plugin never handles tokens, and each connection is scoped to one project you choose.
+This plugin registers Supabuild's remote MCP server (Streamable HTTP) and adds skills that teach your agent its tools. You sign in with OAuth in your client; the plugin never handles tokens, and each connection is scoped to one project you choose.
 
 ## Install
 
@@ -137,9 +137,45 @@ The `sign-in` skill walks through the same steps for whichever client you're in.
 
 Claude Code and Copilot CLI list these as `/hamster:<skill>`. Cursor and Grok Build list them as `/<skill>`, and Pi as `/skill:<skill>`. In OpenCode, ask for one by name, or in OpenCode 2 mention it as `@sign-in`. The table uses the Claude form.
 
-| Skill | Description |
-|-------|-------------|
-| `/hamster:sign-in` | Connect the client to the Supabuild MCP server with OAuth, scope it to one project, and sign in again when the token expires |
+| Skill | Tools | Description |
+|-------|-------|-------------|
+| `/hamster:sign-in` | — | Connect the client to the Supabuild MCP server with OAuth, scope it to one project, and sign in again when the token expires |
+| `/hamster:discovery-agent [request]` | `create`, `message`, `read`, `update`, `delete` | Ask the Discovery agent to research, answer, draft proposed knowledge, or start a delivery thread, and follow the ask until it finishes |
+| `/hamster:team-knowledge [topic]` | `search`, `read` | Read the team's published knowledge, in the document types your team uses, and gather the guidance a feature must follow |
+| `/hamster:delivery-threads [thread]` | `read`, `message`, `update`, `create` | Follow delivery threads, see what each is waiting for, and steer, answer or retry them |
+
+### The tools
+
+The MCP server provides six tools: `create`, `read`, `update`, `delete`, `search` and `message`. Each takes a `path` naming a thing, such as `discovery/<invocationId>` or `knowledge/scopes/checkout.md`, and `create`, `update`, `search` and `message` also take a Markdown `body` where the path needs one; `read` and `delete` take none. `read` with path `/` returns the full ontology: every path, what each tool does on it, and what comes back, followed by the knowledge types your team uses. The tools don't define knowledge types; they are your team's own.
+
+| Tool | Paths |
+|------|-------|
+| `create` | `discovery` (ask), `threads/<threadId>/deliveries/<deliveryId>/retries` (retry) |
+| `read` | `/` (the ontology and your team's knowledge types), `discovery/<invocationId>`, `threads`, `threads/<threadId>`, `knowledge` (list), `knowledge/<documentId or path>`, `knowledge/<documentId>/links` |
+| `update` | `discovery/<invocationId>/requests/<requestId>` (answer the Discovery agent), `threads/<threadId>/questions/<questionId>` (answer a thread) |
+| `delete` | `discovery/<invocationId>` (cancel an ask) |
+| `search` | `knowledge?q=<words>` (search published knowledge by words; each result has its id, path, type, standing, score and snippet), `knowledge/context` (the guidance a feature request must follow, with the request as body) |
+| `message` | `discovery/<invocationId>` (follow up an ask), `threads/<threadId>` (steer a thread) |
+
+`search` and `read` change nothing. `create`, `update` and `message` are marked idempotent, so a retry with the same path, key and body is safe; `delete` is too, since cancelling again has no further effect. Clients may ask you to approve `create`, `update`, `delete` and `message` calls before they run.
+
+The tool descriptions come from the server; this repository carries none. A few rules the skills teach:
+
+- **Asks can outlast the call.** `create discovery` waits about 50 seconds for the answer. If the turn takes longer, it returns `working` with an `invocationId`, and the agent polls `read discovery/<invocationId>` until the ask is `completed`, `failed` or `input_required`.
+- **Retries apply once.** Every `create` and `message`, and every answer to a thread question, carries a stable `?key=` in its path. After an uncertain result, the agent retries with the same path, key and body, so the change applies at most once. A new key is a new request; the same key with a different body is a `conflict`.
+- **People decide.** The Discovery agent can propose knowledge, but only a person accepts or rejects a proposal, in the web app. Results carry a `studioUrl` link to hand them.
+- **Threads start with an ask.** There is no path that creates a delivery thread; `create discovery` asks the Discovery agent, which starts them.
+
+### Examples
+
+```
+/hamster:discovery-agent What should we decide about rate limiting before we build the public API?
+/hamster:discovery-agent Draft a scope for exporting invoices as CSV and start delivery once it's clear.
+/hamster:team-knowledge What does our accepted guidance say about authentication?
+/hamster:team-knowledge Gather the decisions and methods that apply to adding a checkout coupon field.
+/hamster:delivery-threads Which threads are waiting on me, and for what?
+/hamster:delivery-threads Tell the checkout thread to add a test for the empty cart case.
+```
 
 ## Maintaining the plugin
 
@@ -165,7 +201,7 @@ The root `package.json` is the Pi package. Pi installs a git repository from its
 
 ## Advanced: MCP without the plugin
 
-Use this only when you want the Supabuild tools in a client without installing the plugin. Add `https://supabuild.invalid/mcp` as a remote MCP server and sign in through your client's OAuth flow. The sign-in skill comes with the plugin.
+Use this only when you want the Supabuild tools in a client without installing the plugin. Add `https://supabuild.invalid/mcp` as a remote MCP server and sign in through your client's OAuth flow. The skills come with the plugin.
 
 ---
 
