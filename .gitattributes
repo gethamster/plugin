@@ -2,9 +2,5 @@
 
 # Skills are text-only and the validator measures their bytes with CRLF
 # normalized to LF, so every checked-out file must match what CI measures.
-# ensure-ready.ps1 is LF today and PowerShell parses LF fine, so pin it LF too
-# rather than introducing a CRLF file the byte gate would count differently.
-*.sh text eol=lf
-*.ps1 text eol=lf
 *.md text eol=lf
 *.json text eol=lf

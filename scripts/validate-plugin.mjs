@@ -34,8 +34,8 @@ const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
 // generated gemini-extension.json instead. Without it, Antigravity stages the
 // MCP server with an empty command instead of the URL in mcp_config.json. The
 // file keeps the Agent Plugins fields. It must not declare "$schema": with the
-// Agent Plugins schema, Copilot CLI reads agents only from com.github.copilot/agents/
-// and registers neither worker.
+// Agent Plugins schema, Copilot CLI reads agents only from
+// com.github.copilot/agents/.
 const pluginManifestFields = new Set([
   "name",
   "version",
@@ -245,17 +245,6 @@ async function validateSkills(pluginDir, pluginName) {
         `${pluginName}: skill frontmatter name "${parsed.name}" does not match its directory "${directory}" (${path.relative(repoRoot, file)}).`
       );
     }
-  }
-}
-
-async function validateAgents(pluginDir, pluginName) {
-  const agentsDir = path.join(pluginDir, "agents");
-  if (!(await pathExists(agentsDir))) {
-    return;
-  }
-  const files = (await walkFiles(agentsDir)).filter((file) => file.endsWith(".md"));
-  for (const file of files) {
-    await validateFrontmatterFile(file, "agent", ["name", "description"], pluginName);
   }
 }
 
@@ -581,7 +570,7 @@ async function validateCodexInterface(iface) {
       codexError(`defaultPrompt[${index}]`, 'must not mention another plugin with "@".');
     }
     if (/https?:\/\//i.test(prompt)) {
-      codexError(`defaultPrompt[${index}]`, "must not send the agent to a URL; name a bundled skill such as $hamster:setup instead.");
+      codexError(`defaultPrompt[${index}]`, "must not send the agent to a URL; name a bundled skill such as $hamster:sign-in instead.");
     }
     const normalized = prompt.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
     if (seenPrompts.has(normalized)) {
@@ -602,7 +591,7 @@ async function validateCodexInterface(iface) {
 
   // Exactly the three listing images, at the paths Codex resolves inside the
   // installed plugin folder. screenshots stay unset: the directory allows them
-  // only for an MCP server with a custom UI, and Hamster's has none.
+  // only for an MCP server with a custom UI, and Supabuild's has none.
   for (const [field, expected] of Object.entries(CODEX_LISTING_IMAGES)) {
     if (iface[field] !== expected) {
       codexError(field, `must be "${expected}", got ${JSON.stringify(iface[field])}.`);
@@ -782,7 +771,7 @@ async function validateNoAntigravityNest() {
   // package that plugins/hamster replaced.
   for (const nestRoot of [".agents", "_agents"]) {
     if (await pathExists(path.join(repoRoot, nestRoot, "plugins", "hamster"))) {
-      addError(`Delete ${nestRoot}/plugins/hamster; agy installs Hamster from ${PLUGIN_PATH}.`);
+      addError(`Delete ${nestRoot}/plugins/hamster; agy installs the plugin from ${PLUGIN_PATH}.`);
     }
   }
 }
@@ -790,29 +779,7 @@ async function validateNoAntigravityNest() {
 // Clients are free to install, copy, or load one skill directory on its own, so a
 // skill that reaches into a sibling breaks on arrival. Shared material is
 // duplicated instead, and these groups keep the copies byte-identical.
-const DUPLICATE_GROUPS = [
-  [
-    "plugins/hamster/skills/setup/scripts/ensure-ready.sh",
-    "plugins/hamster/skills/ship/scripts/ensure-ready.sh",
-    "plugins/hamster/skills/plan-hamster/scripts/ensure-ready.sh",
-    "plugins/hamster/skills/resume-hamster/scripts/ensure-ready.sh",
-  ],
-  [
-    "plugins/hamster/skills/setup/scripts/ensure-ready.ps1",
-    "plugins/hamster/skills/ship/scripts/ensure-ready.ps1",
-    "plugins/hamster/skills/plan-hamster/scripts/ensure-ready.ps1",
-    "plugins/hamster/skills/resume-hamster/scripts/ensure-ready.ps1",
-  ],
-  [
-    "plugins/hamster/skills/ship/references/brief-selection.md",
-    "plugins/hamster/skills/plan-hamster/references/brief-selection.md",
-    "plugins/hamster/skills/resume-hamster/references/brief-selection.md",
-  ],
-  ["plugins/hamster/skills/ship/references/execution-loop.md", "plugins/hamster/skills/resume-hamster/references/execution-loop.md"],
-  ["plugins/hamster/skills/ship/references/agents/task-executor.md", "plugins/hamster/skills/resume-hamster/references/agents/task-executor.md"],
-  ["plugins/hamster/skills/ship/references/agents/wave-reviewer.md", "plugins/hamster/skills/resume-hamster/references/agents/wave-reviewer.md"],
-  ["LICENSE", "plugins/hamster/LICENSE"],
-];
+const DUPLICATE_GROUPS = [["LICENSE", "plugins/hamster/LICENSE"]];
 
 const skillDirReferencePattern = /\$SKILL_DIR\/([A-Za-z0-9._/-]+)/g;
 const skillDirReferencePatternPowerShell = /\$SkillDir\\([A-Za-z0-9._\\-]+)/g;
@@ -938,15 +905,14 @@ async function validateLayout() {
   }
 
   await validateSkills(pluginDir, "hamster");
-  await validateAgents(pluginDir, "hamster");
 }
 
-// The root holds the Gemini extension: gemini-extension.json, skills/, and
-// agents/, which sync-adapters.mjs generates from plugins/hamster and checks for
-// drift. Given the bare repository URL, agy installs that root as one plugin,
-// so it gets all of those skills and agents. Any other plugin manifest or
-// component at the root would change what agy or another client installs, so
-// these stay in plugins/hamster.
+// The root holds the Gemini extension: gemini-extension.json and skills/,
+// which sync-adapters.mjs generates from plugins/hamster and checks for drift.
+// Given the bare repository URL, agy installs that root as one plugin, so it
+// gets all of those skills. Any other plugin manifest or component at the root
+// would change what agy or another client installs, so these stay in
+// plugins/hamster.
 const ROOT_PLUGIN_ENTRIES = [
   "plugin.json",
   ".claude-plugin/plugin.json",
@@ -991,7 +957,6 @@ async function validateGrokRootManifest() {
   }
   const expected = {
     skills: { target: `./${PLUGIN_PATH}/skills`, kind: "directory" },
-    agents: { target: `./${PLUGIN_PATH}/agents`, kind: "directory" },
     mcpServers: { target: `./${PLUGIN_PATH}/.mcp.json`, kind: "file" },
   };
   for (const [field, { target, kind }] of Object.entries(expected)) {

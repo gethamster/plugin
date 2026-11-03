@@ -10,12 +10,10 @@ import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// Scripts are spawned by these fixed relative paths from a known cwd (a
-// fixture copy, or the checkout for the setup scripts), never by an absolute
-// path built from where the checkout happens to live.
+// Scripts are spawned by these fixed relative paths from a fixture copy's cwd,
+// never by an absolute path built from where the checkout happens to live.
 const VALIDATOR = "scripts/validate-plugin.mjs";
 const BUNDLE_BUILDER = "scripts/build-codex-bundle.mjs";
-const READY_SCRIPT = "plugins/hamster/skills/setup/scripts/ensure-ready.sh";
 
 const PACKAGE_ENTRIES = [
   "plugins",
@@ -26,11 +24,9 @@ const PACKAGE_ENTRIES = [
   ".grok-plugin",
   "gemini-extension.json",
   "skills",
-  "agents",
   ".agents",
   "assets",
   "scripts",
-  "codex-directory",
   "README.md",
 ];
 
@@ -411,21 +407,19 @@ test("the generated Gemini extension at the root fails validation when it drifts
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   manifest.version = "0.0.1";
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-  await writeFile(path.join(cwd, "skills", "setup", "SKILL.md"), "edited at the root\n");
+  await writeFile(path.join(cwd, "skills", "sign-in", "SKILL.md"), "edited at the root\n");
   await writeFile(path.join(cwd, "skills", "stray.md"), "not in plugins/hamster\n");
-  await chmod(path.join(cwd, "skills", "ship", "scripts", "ensure-ready.sh"), 0o644);
-  // Gemini rejects `color` in agent frontmatter, so the root agents leave it out.
-  await cp(plugin(cwd, "agents", "wave-reviewer.md"), path.join(cwd, "agents", "wave-reviewer.md"));
-  await writeFile(path.join(cwd, "agents", "extra.md"), "---\nname: extra\n---\n");
+  // The executable bit is part of the copy.
+  await writeFile(plugin(cwd, "skills", "sign-in", "notes.md"), "notes\n");
+  await cp(plugin(cwd, "skills", "sign-in", "notes.md"), path.join(cwd, "skills", "sign-in", "notes.md"));
+  await chmod(path.join(cwd, "skills", "sign-in", "notes.md"), 0o755);
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /gemini-extension\.json is out of sync with plugins\/hamster\/plugin\.json/);
-  assert.match(result.stderr, /skills\/setup\/SKILL\.md is out of sync with plugins\/hamster\/skills\//);
+  assert.match(result.stderr, /skills\/sign-in\/SKILL\.md is out of sync with plugins\/hamster\/skills\//);
   assert.match(result.stderr, /skills\/stray\.md is out of sync with plugins\/hamster\/skills\//);
-  assert.match(result.stderr, /skills\/ship\/scripts\/ensure-ready\.sh is out of sync with plugins\/hamster\/skills\//);
-  assert.match(result.stderr, /agents\/wave-reviewer\.md is out of sync/);
-  assert.match(result.stderr, /agents\/extra\.md is not a generated agent/);
+  assert.match(result.stderr, /skills\/sign-in\/notes\.md is out of sync with plugins\/hamster\/skills\//);
 
   const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
   assert.equal(sync.code, 0, sync.stderr);
@@ -436,31 +430,26 @@ test("the generated Gemini extension at the root fails validation when it drifts
   assert.equal(regenerated.version, JSON.parse(await readFile(plugin(cwd, "plugin.json"), "utf8")).version);
   // Gemini reads a remote HTTP server from httpUrl; `url` alone would be SSE.
   assert.deepEqual(regenerated.mcpServers, { hamster: { httpUrl: mcp.mcpServers.hamster.url } });
-  assert.doesNotMatch(await readFile(path.join(cwd, "agents", "wave-reviewer.md"), "utf8"), /^(color|model):/m);
-  assert.equal(await pathExists(path.join(cwd, "agents", "extra.md")), false);
+  assert.equal(await pathExists(path.join(cwd, "skills", "stray.md")), false);
 });
 
-test("a root skills/ or agents/ linked to plugins/hamster, or a missing Gemini root, fails validation", async () => {
+test("a root skills/ linked to plugins/hamster, or a missing Gemini root, fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-gemini-links-");
   await copyPackage(cwd);
   // A link reads the same bytes as the source but installs nothing on clients
   // that don't materialize symbolic links.
   await rm(path.join(cwd, "skills"), { recursive: true });
   await symlink(path.join("plugins", "hamster", "skills"), path.join(cwd, "skills"));
-  await rm(path.join(cwd, "agents"), { recursive: true });
-  await symlink(path.join("plugins", "hamster", "agents"), path.join(cwd, "agents"));
 
   const linked = await runValidator(cwd);
   assert.notEqual(linked.code, 0);
   assert.match(linked.stderr, /skills\/ must be a generated directory, not a link/);
-  assert.match(linked.stderr, /agents\/ must be a generated directory, not a link/);
 
   const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
   assert.equal(sync.code, 0, sync.stderr);
   assert.equal((await lstat(path.join(cwd, "skills"))).isDirectory(), true);
-  assert.equal((await lstat(path.join(cwd, "agents"))).isDirectory(), true);
-  // Writing the Gemini agents must not go through the link into plugins/hamster.
-  assert.match(await readFile(plugin(cwd, "agents", "wave-reviewer.md"), "utf8"), /^color: /m);
+  // Replacing the link must not delete the source it pointed at.
+  assert.equal(await pathExists(plugin(cwd, "skills", "sign-in", "SKILL.md")), true);
   assert.equal((await runValidator(cwd)).code, 0);
 
   await rm(path.join(cwd, "skills"), { recursive: true });
@@ -476,10 +465,10 @@ test("a Grok root manifest that drifts or stops pointing into plugins/hamster fa
   await copyPackage(cwd);
   const manifestPath = path.join(cwd, ".grok-plugin", "plugin.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  // A release that bumps plugins/hamster but not this file, and an agents
-  // array, which Grok reads as zero agents.
+  // A release that bumps plugins/hamster but not this file, and a skills
+  // array instead of the directory path.
   manifest.version = "0.0.1";
-  manifest.agents = ["./plugins/hamster/agents/task-executor.md"];
+  manifest.skills = ["./plugins/hamster/skills/sign-in"];
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   await mkdir(path.join(cwd, ".gemini-plugin"), { recursive: true });
   await writeFile(path.join(cwd, ".gemini-plugin", "plugin.json"), "{}\n");
@@ -487,7 +476,7 @@ test("a Grok root manifest that drifts or stops pointing into plugins/hamster fa
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /\.grok-plugin\/plugin\.json is out of sync with plugins\/hamster\/plugin\.json/);
-  assert.match(result.stderr, /\.grok-plugin\/plugin\.json agents must be the directory path "\.\/plugins\/hamster\/agents"/);
+  assert.match(result.stderr, /\.grok-plugin\/plugin\.json skills must be the directory path "\.\/plugins\/hamster\/skills"/);
   assert.match(result.stderr, /\.gemini-plugin\/plugin\.json must not exist at the repository root; only \.grok-plugin\/plugin\.json may/);
 
   const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
@@ -498,13 +487,13 @@ test("a Grok root manifest that drifts or stops pointing into plugins/hamster fa
 test("a symlink or an image inside plugins/hamster fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-folder-files-");
   await copyPackage(cwd);
-  await symlink("agents", plugin(cwd, "linked-agents"));
-  await cp(path.join(cwd, "assets", "logo.png"), plugin(cwd, "skills", "setup", "logo.png"));
+  await symlink("skills", plugin(cwd, "linked-skills"));
+  await cp(path.join(cwd, "assets", "logo.png"), plugin(cwd, "skills", "sign-in", "logo.png"));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/linked-agents is a symbolic link/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/logo\.png is an image/);
+  assert.match(result.stderr, /plugins\/hamster\/linked-skills is a symbolic link/);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/sign-in\/logo\.png is an image/);
 });
 
 test("images inside plugins/hamster fail except the Claude icon and the three Codex listing PNGs", async () => {
@@ -513,14 +502,14 @@ test("images inside plugins/hamster fail except the Claude icon and the three Co
   const iconPath = plugin(cwd, ".claude-plugin", "icon.svg");
   // The same SVG anywhere else in the plugin is still a bundled image.
   await cp(iconPath, plugin(cwd, "icon.svg"));
-  await cp(iconPath, plugin(cwd, "skills", "setup", "icon.svg"));
+  await cp(iconPath, plugin(cwd, "skills", "sign-in", "icon.svg"));
   const icon = await readFile(iconPath, "utf8");
   await writeFile(iconPath, icon.replace("</svg>", '<image href="https://example.com/logo.png"/></svg>'));
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /plugins\/hamster\/icon\.svg is an image/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/setup\/icon\.svg is an image/);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/sign-in\/icon\.svg is an image/);
   assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not contain <image>/);
   assert.match(result.stderr, /plugins\/hamster\/\.claude-plugin\/icon\.svg must not reference external resources/);
   assert.doesNotMatch(result.stderr, /\.claude-plugin\/icon\.svg is an image/);
@@ -626,8 +615,8 @@ test("a plugin.json missing a field the Pi package copies stops the sync", async
 test("a drifted duplicate fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-drift-");
   await copyPackage(cwd);
-  const copyPath = plugin(cwd, "skills", "ship", "scripts", "ensure-ready.sh");
-  await writeFile(copyPath, `${await readFile(copyPath, "utf8")}\n# drift\n`);
+  const copyPath = plugin(cwd, "LICENSE");
+  await writeFile(copyPath, `${await readFile(copyPath, "utf8")}\ndrift\n`);
 
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
@@ -655,7 +644,7 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   for (const expected of [".codex-plugin/plugin.json", ".mcp.json", "assets/icon.png", "assets/logo.png", "assets/logo-dark.png", "LICENSE"]) {
     assert.ok(entries.includes(expected), `expected ${expected} in ${entries.join(", ")}`);
   }
-  for (const forbidden of ["plugin.json", "mcp.json", "mcp_config.json", "agents/task-executor.md"]) {
+  for (const forbidden of ["plugin.json", "mcp.json", "mcp_config.json"]) {
     assert.ok(!entries.includes(forbidden), `did not expect ${forbidden} in the bundle`);
   }
 
@@ -680,13 +669,6 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   }
   assert.equal(entries.some((entry) => entry.includes("plugins/hamster/assets/")), false);
   assert.equal(entries.filter((entry) => entry === "LICENSE" || entry.endsWith("/LICENSE")).length, 1);
-
-  // The directory's setup asks the user to install the CLI; every other section stays.
-  const setupDump = await run("unzip", ["-p", zipPath, "skills/setup/SKILL.md"]);
-  assert.equal(setupDump.code, 0, setupDump.stderr);
-  assert.equal(setupDump.stdout.includes("tryhamster.com/cli/install"), false);
-  const headings = (skill) => skill.split("\n").filter((line) => line.startsWith("## "));
-  assert.deepEqual(headings(setupDump.stdout), headings(await readFile(plugin(cwd, "skills", "setup", "SKILL.md"), "utf8")));
 });
 
 test("archive bytes follow the checkout, not the machine building it", async () => {
@@ -716,7 +698,7 @@ test("an uncommitted bundle source stops the build", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-dirty-");
   await copyPackage(cwd);
   await commitPackage(cwd);
-  const skillPath = plugin(cwd, "skills", "ship", "SKILL.md");
+  const skillPath = plugin(cwd, "skills", "sign-in", "SKILL.md");
   await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
   // Regenerate the root copy so the edit passes validation and only the dirty
   // checkout stops the build.
@@ -726,53 +708,6 @@ test("an uncommitted bundle source stops the build", async () => {
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /Commit or stash your changes first/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/ship\/SKILL\.md/);
+  assert.match(result.stderr, /plugins\/hamster\/skills\/sign-in\/SKILL\.md/);
   assert.equal(await pathExists(zipPath), false);
-});
-
-test("a setup skill whose install section is renamed stops the Codex bundle build", async () => {
-  const cwd = await makeTemp("hamster-plugin-bundle-install-section-");
-  await copyPackage(cwd);
-  // Without its heading, the directory's section has nothing to replace and
-  // the agent-run installer would ship to the directory.
-  const skillPath = plugin(cwd, "skills", "setup", "SKILL.md");
-  const skill = await readFile(skillPath, "utf8");
-  await writeFile(skillPath, skill.replace("\n## Install the CLI\n", "\n## Get the CLI\n"));
-  await commitPackage(cwd);
-
-  const { result, zipPath } = await buildCodexBundle(cwd);
-  assert.notEqual(result.code, 0);
-  assert.equal(await pathExists(zipPath), false);
-});
-
-test("failed hamster status prints to stderr and stdout stays SETUP_NEEDED", async () => {
-  const home = await makeTemp("hamster-ready-home-");
-  const bin = path.join(home, ".hamster", "bin");
-  await mkdir(bin, { recursive: true });
-  const hamster = path.join(bin, "hamster");
-  await writeFile(
-    hamster,
-    `#!/usr/bin/env bash
-if [[ "$1" == "--no-tui" && "$2" == "status" ]]; then
-  echo "status failed: not logged in"
-  exit 1
-fi
-echo "unexpected hamster invocation: $*"
-exit 0
-`
-  );
-  await chmod(hamster, 0o755);
-
-  const result = await run("bash", [READY_SCRIPT], {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      HOME: home,
-      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}`,
-    },
-  });
-
-  assert.equal(result.code, 1);
-  assert.equal(result.stdout.trim(), "SETUP_NEEDED");
-  assert.match(result.stderr, /status failed: not logged in/);
 });
