@@ -42,7 +42,7 @@
   },
   "extensions": {
     "com.openai": {
-      "onboardingSkill": "./skills/setup/SKILL.md",
+      "onboardingSkill": "./skills/sign-in/SKILL.md",
       "review": {
         "test_cases": {
           "positive": [
