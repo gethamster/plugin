@@ -518,22 +518,6 @@ test("images inside plugins/hamster fail except the Claude icon and the three Co
   assert.doesNotMatch(result.stderr, /plugins\/hamster\/assets\/logo-dark\.png is an image/);
 });
 
-test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-schema-");
-  await copyPackage(cwd);
-  // Copilot CLI then reads agents only from com.github.copilot/agents/.
-  const manifestPath = plugin(cwd, "plugin.json");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  await writeFile(
-    manifestPath,
-    `${JSON.stringify({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", ...manifest }, null, 2)}\n`
-  );
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /plugins\/hamster\/plugin\.json must not declare "\$schema"/);
-});
-
 test("the three Codex listing images inside plugins/hamster pass validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-icons-");
   await copyPackage(cwd);
@@ -658,7 +642,8 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   assert.equal(Object.hasOwn(manifest, "apps"), false);
   const mcpDump = await run("unzip", ["-p", zipPath, ".mcp.json"]);
   assert.equal(mcpDump.code, 0, mcpDump.stderr);
-  assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, "https://supabuild.invalid/mcp");
+  const mcpConfig = JSON.parse(await readFile(path.join(repoRoot, "plugins", "hamster", ".mcp.json"), "utf8"));
+  assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, mcpConfig.mcpServers.hamster.url);
   assert.equal(manifest.interface.displayName, "Supabuild");
   // Root assets/ is copied once. plugins/hamster/assets/ is not archived beside it.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");

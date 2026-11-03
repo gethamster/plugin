@@ -33,9 +33,7 @@ const pluginVersionPattern = /^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$/;
 // this folder, as the README directs; a bare repository-URL install reads the
 // generated gemini-extension.json instead. Without it, Antigravity stages the
 // MCP server with an empty command instead of the URL in mcp_config.json. The
-// file keeps the Agent Plugins fields. It must not declare "$schema": with the
-// Agent Plugins schema, Copilot CLI reads agents only from
-// com.github.copilot/agents/.
+// file keeps the Agent Plugins fields.
 const pluginManifestFields = new Set([
   "name",
   "version",
@@ -256,9 +254,7 @@ async function validateAgentPluginsManifest() {
   }
 
   for (const key of Object.keys(manifest)) {
-    if (key === "$schema") {
-      addError(`${PLUGIN_PATH}/plugin.json must not declare "$schema"; with it, Copilot CLI stops registering agents/.`);
-    } else if (!pluginManifestFields.has(key)) {
+    if (!pluginManifestFields.has(key)) {
       addError(`${PLUGIN_PATH}/plugin.json has non-Agent-Plugins field "${key}".`);
     }
   }

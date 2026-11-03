@@ -25,10 +25,10 @@ If the tools are missing, or a call fails with `error.code` `unauthorized`, use 
 | `search` | `knowledge?q=<words>&standing=…&limit=…&revision=…` | none | Find documents by words. Each result has its `id`, `path`, `type`, `standing`, `score`, a `snippet` and its `studioUrl`. `limit` is 1 to 50 |
 | `search` | `knowledge/context?seed=<id>,<id>&revision=…` | the feature request | Gather the guidance a feature request must follow |
 | `read` | `knowledge?type=…&standing=…&limit=…&revision=…` | none | List published documents. To list one kind, filter by its type instead of listing everything: a team that writes `decision` documents lists its accepted decisions with `knowledge?type=decision&standing=accepted`. `read /` lists the types your team uses. `limit` goes up to 500 |
-| `read` | `knowledge/<documentId>` or `knowledge/<document path>` | none | Read one document: its Markdown content, standing, rationale, links and backlinks. For example `knowledge/scopes/checkout.md` |
+| `read` | `knowledge/<documentId>` or `knowledge/<document path>` | none | Read one document: its Markdown content, standing, rationale, links and backlinks. For example `knowledge/notes/checkout.md` |
 | `read` | `knowledge/<documentId>/links?depth=…&rel=…&direction=…&limit=…` | none | Follow typed links such as `constrained_by`, `supersedes` and `references`. `depth` is 1 to 4, `direction` is `in`, `out` or `both`, `limit` goes up to 100 |
 
-Every query part of a path is optional except `q` on `search`. Separate several values with commas, for example `type=<type>,<type>`. Types match regardless of case. A word in `q` that holds `?`, `#` or `%` percent-encodes it (`%3F`, `%23`, `%25`).
+Every query part of a path is optional except `q` on `search`. Separate several `type`, `seed` or `rel` values with commas; `standing` takes one. Types match regardless of case. A word in `q` that holds `?`, `#` or `%` percent-encodes it (`%3F`, `%23`, `%25`).
 
 Every result names the exact revision it read. Omit `revision` to use the current one, and pass a revision only to read an earlier state on purpose.
 
@@ -41,7 +41,7 @@ To see what the team has, `read` `{path: "/"}` for the types in use. To list one
 ## Look something up
 
 1. Search with a few specific words, for example `search` `{path: "knowledge?q=refunds"}`. Add `&standing=accepted` to see only current guidance. Each result has its `id`, `path`, `standing` and a `snippet`.
-2. Open the most relevant results with `read` by id (`knowledge/<documentId>`) or by path (`knowledge/scopes/checkout.md`) to get the full Markdown, its standing, rationale, links and backlinks.
+2. Open the most relevant results with `read` by id (`knowledge/<documentId>`) or by path (`knowledge/notes/checkout.md`) to get the full Markdown, its standing, rationale, links and backlinks.
 3. To see what a document constrains, supersedes or depends on, read `knowledge/<documentId>/links`. When the result says `complete` is false, the depth or limit cut the walk short; raise them or say the picture is partial.
 
 Quote only what the documents say, and name the standing of each one you rely on. Don't present a `proposed` or `historical` document as current guidance.

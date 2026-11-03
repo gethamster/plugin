@@ -17,9 +17,9 @@ This skill uses these paths:
 | `message` | `discovery/<invocationId>?key=<key>` | your follow-up | Follows up a finished ask in the same conversation |
 | `read` | `discovery/<invocationId>` | none | Reads an ask's state |
 | `update` | `discovery/<invocationId>/requests/<requestId>` | your answer, or none with `?option=<optionId>` | Answers one of the agent's questions |
-| `delete` | `discovery/<invocationId>` | none | Cancels an ask |
+| `delete` | `discovery/<invocationId>` | none | Cancels an ask (a finished ask comes back unchanged; stopping a running one isn't supported yet) |
 
-Your client may ask the user to approve each `create` and `message` call before it runs.
+Your client may ask the user to approve each `create`, `update`, `delete` and `message` call before it runs.
 
 If these tools are missing, or a call fails with `error.code` `unauthorized`, use the `sign-in` skill first (`/hamster:sign-in` in Claude Code).
 
@@ -83,7 +83,7 @@ The same ask then continues. Handle the result the same way as the first call.
 
 ## Knowledge the agent proposes
 
-The Discovery agent can draft and propose knowledge, but only a person can accept or reject a proposal, and they do it in the web app. No agent or connector can accept one for them. When the agent proposes something, give the user the `studioUrl` from the result so they can review it, and don't describe the proposal as accepted.
+The Discovery agent can draft and propose knowledge, but only a person can accept or reject a proposal, and they do it in the web app. No agent or connector can accept one for them. When the agent proposes something, read the proposal (`search` `knowledge?q=…&standing=proposed`, or `read` `knowledge/<documentId>`) and give the user its `studioUrl` so they can review it, and don't describe the proposal as accepted.
 
 ## Delivery threads the agent starts
 
