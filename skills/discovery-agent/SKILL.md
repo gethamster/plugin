@@ -1,6 +1,6 @@
 ---
 name: discovery-agent
-description: Ask your team's Supabuild Discovery agent to research, answer, draft proposed knowledge, or start a delivery thread, and follow the ask until it finishes. Use for open-ended questions about the team's work and for any request that should become a change or a delivery thread.
+description: Ask your team's Supabuild Discovery agent for new research, a draft of proposed knowledge, or a new delivery thread, and follow the ask until it finishes. Use when the person asks for new work. To look up what the team has already decided or what a thread is doing, use team-knowledge or delivery-threads instead, which start nothing.
 ---
 
 # Ask the Discovery agent
