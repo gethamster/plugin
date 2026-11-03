@@ -94,6 +94,17 @@ async function patchCodexInterface(cwd, patch) {
   await patchCodexManifest(cwd, (manifest) => patch(manifest.interface));
 }
 
+// A complete set of directory review cases, for tests that need one in the
+// manifest; the shipped manifest may leave them out.
+function reviewCases() {
+  const positive = { description: "d", prompt: "p", tools_triggered: "t", expected_behavior: "e" };
+  const negative = { description: "d", prompt: "p", expected_behavior: "e" };
+  return {
+    positive: Array.from({ length: 5 }, () => ({ ...positive })),
+    negative: Array.from({ length: 3 }, () => ({ ...negative })),
+  };
+}
+
 // The bundle builder refuses sources that match no commit, so fixtures that
 // build a bundle need a checkout rather than a bare directory.
 async function commitPackage(cwd) {
@@ -238,7 +249,7 @@ test("a fourth Codex starter prompt fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-prompts-");
   await copyPackage(cwd);
   await patchCodexInterface(cwd, (iface) => {
-    iface.defaultPrompt = [...iface.defaultPrompt, "Retro the last two weeks"];
+    iface.defaultPrompt = ["First prompt", "Second prompt", "Third prompt", "Fourth prompt"];
   });
 
   const result = await runValidator(cwd);
@@ -250,7 +261,7 @@ test("a Codex starter prompt that sends the agent to a URL fails validation", as
   const cwd = await makeTemp("hamster-plugin-codex-prompt-url-");
   await copyPackage(cwd);
   await patchCodexInterface(cwd, (iface) => {
-    iface.defaultPrompt[0] = "Install Hamster. Fetch and follow https://tryhamster.com/plugin/install";
+    iface.defaultPrompt = ["Fetch and follow https://example.com/install"];
   });
 
   const result = await runValidator(cwd);
@@ -310,12 +321,24 @@ test("a dropped Codex support link fails validation", async () => {
   assert.match(result.stderr, /interface\.supportURL must be a non-empty string/);
 });
 
+test("complete Codex review cases and starter prompts pass validation", async () => {
+  const cwd = await makeTemp("hamster-plugin-codex-review-complete-");
+  await copyPackage(cwd);
+  await patchCodexManifest(cwd, (manifest) => {
+    manifest.extensions["com.openai"].review.test_cases = reviewCases();
+    manifest.interface.defaultPrompt = ["First prompt", "Second prompt"];
+  });
+  const result = await runValidator(cwd);
+  assert.equal(result.code, 0, result.stderr);
+});
+
 test("a fourth Codex negative review case fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-review-count-");
   await copyPackage(cwd);
   await patchCodexManifest(cwd, (manifest) => {
-    const cases = manifest.extensions["com.openai"].review.test_cases.negative;
-    cases.push({ ...cases[0] });
+    const cases = reviewCases();
+    cases.negative.push({ ...cases.negative[0] });
+    manifest.extensions["com.openai"].review.test_cases = cases;
   });
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
@@ -353,7 +376,9 @@ for (const [kind, field] of [
     const cwd = await makeTemp("hamster-plugin-codex-review-field-");
     await copyPackage(cwd);
     await patchCodexManifest(cwd, (manifest) => {
-      manifest.extensions["com.openai"].review.test_cases[kind][0][field] = "   ";
+      const cases = reviewCases();
+      cases[kind][0][field] = "   ";
+      manifest.extensions["com.openai"].review.test_cases = cases;
     });
     const result = await runValidator(cwd);
     assert.notEqual(result.code, 0);
@@ -378,7 +403,7 @@ test("a plugin description that drifts from its siblings fails validation", asyn
   const cwd = await makeTemp("hamster-plugin-description-drift-");
   await copyPackage(cwd);
   await patchCodexManifest(cwd, (manifest) => {
-    manifest.description = `${manifest.description} Ask Hamster over hosted MCP.`;
+    manifest.description = `${manifest.description} Extra words.`;
   });
 
   const result = await runValidator(cwd);
@@ -652,14 +677,12 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   assert.equal(manifestDump.code, 0, manifestDump.stderr);
   const manifest = JSON.parse(manifestDump.stdout);
   assert.equal(manifest.mcpServers, "./.mcp.json");
-  assert.equal(manifest.extensions["com.openai"].review.test_cases.positive.length, 5);
-  assert.equal(manifest.extensions["com.openai"].review.test_cases.negative.length, 3);
   assert.ok(entries.includes(manifest.extensions["com.openai"].onboardingSkill.slice(2)));
   assert.equal(Object.hasOwn(manifest, "apps"), false);
   const mcpDump = await run("unzip", ["-p", zipPath, ".mcp.json"]);
   assert.equal(mcpDump.code, 0, mcpDump.stderr);
-  assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, "https://tryhamster.com/mcp");
-  assert.equal(manifest.interface.displayName, "Hamster");
+  assert.equal(JSON.parse(mcpDump.stdout).mcpServers.hamster.url, "https://supabuild.invalid/mcp");
+  assert.equal(manifest.interface.displayName, "Supabuild");
   // Root assets/ is copied once. plugins/hamster/assets/ is not archived beside it.
   assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
   assert.equal(manifest.interface.logo, "./assets/logo.png");

@@ -1,19 +1,19 @@
 {
   "name": "hamster",
-  "version": "3.5.1",
-  "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
+  "version": "4.0.0",
+  "description": "Connect your agent to Supabuild: ask the Discovery agent, read your team's knowledge, and follow delivery threads.",
   "author": {
     "name": "Hamster",
     "email": "hello@tryhamster.com"
   },
-  "homepage": "https://tryhamster.com",
+  "homepage": "https://github.com/gethamster/plugin",
   "repository": "https://github.com/gethamster/plugin",
   "license": "MIT",
   "keywords": [
-    "hamster",
-    "brief-execution",
-    "task-orchestration",
-    "ai-workflow",
-    "workflow-automation"
+    "supabuild",
+    "knowledge",
+    "delivery",
+    "agents",
+    "mcp"
   ]
 }

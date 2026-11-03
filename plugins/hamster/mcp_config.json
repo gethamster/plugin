@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "hamster": {
-      "serverUrl": "https://tryhamster.com/mcp"
+      "serverUrl": "https://supabuild.invalid/mcp"
     }
   }
 }

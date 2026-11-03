@@ -1,7 +1,7 @@
 {
   "name": "hamster-plugins",
   "metadata": {
-    "description": "Claude Code plugins for Hamster Studio"
+    "description": "Claude Code plugins for Supabuild"
   },
   "owner": {
     "name": "Hamster",
@@ -10,11 +10,11 @@
   "plugins": [
     {
       "name": "hamster",
-      "description": "Ask Hamster about your team's work and turn briefs into shipped code.",
-      "version": "3.5.1",
+      "description": "Connect your agent to Supabuild: ask the Discovery agent, read your team's knowledge, and follow delivery threads.",
+      "version": "4.0.0",
       "source": "./plugins/hamster",
       "category": "workflow",
-      "homepage": "https://tryhamster.com",
+      "homepage": "https://github.com/gethamster/plugin",
       "repository": "https://github.com/gethamster/plugin",
       "author": {
         "name": "Hamster",
@@ -22,13 +22,18 @@
       },
       "license": "MIT",
       "keywords": [
-        "hamster",
-        "brief-execution",
-        "task-orchestration",
-        "ai-workflow",
-        "workflow-automation"
+        "supabuild",
+        "knowledge",
+        "delivery",
+        "agents",
+        "mcp"
       ],
-      "tags": ["planning", "parallel-execution", "code-review", "git"]
+      "tags": [
+        "knowledge",
+        "delivery",
+        "agents",
+        "mcp"
+      ]
     }
   ]
 }
