@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.gethamster/hamster",
   "title": "Supabuild",
-  "description": "Connect your agent to Supabuild: ask the Discovery agent, read your team's knowledge, and follow delivery threads.",
+  "description": "Ask Supabuild's Discovery agent, read your team's knowledge, and follow delivery threads.",
   "version": "0.1.1",
   "websiteUrl": "https://github.com/gethamster/plugin",
   "repository": {
