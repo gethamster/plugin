@@ -462,11 +462,10 @@ async function validateCodexCatalog(manifestCategory) {
 // Limits follow the final directory submission rules, which are stricter than
 // package upload (shortDescription 240 vs 30, displayName 80 vs 30,
 // developerName 120 vs 80, defaultPrompt 512 vs 128); passing the final numbers
-// passes both. Stricter than published, by choice: capabilities must be a
-// non-empty array, and so must defaultPrompt when it is set, since an empty
-// card is the failure this gate exists to catch. Image contents and
-// brand-color contrast are left to the directory's upload check, which
-// rejects them instantly and reversibly.
+// passes both. Stricter than published, by choice: capabilities and
+// defaultPrompt must be non-empty arrays, since an empty card is the failure
+// this gate exists to catch. Image contents and brand-color contrast are left
+// to the directory's upload check, which rejects them instantly and reversibly.
 // https://developers.openai.com/plugins/deploy/submission-errors
 const codexCategories = new Set([
   "Productivity",
@@ -563,9 +562,7 @@ async function validateCodexInterface(iface) {
   }
 
   const seenPrompts = new Set();
-  const prompts =
-    iface.defaultPrompt === undefined ? [] : codexEntries("defaultPrompt", iface.defaultPrompt, codexListing.defaultPrompt.max);
-  for (const [index, prompt] of prompts) {
+  for (const [index, prompt] of codexEntries("defaultPrompt", iface.defaultPrompt, codexListing.defaultPrompt.max)) {
     if (!requireCodexText(`defaultPrompt[${index}]`, prompt, codexListing.defaultPrompt)) {
       continue;
     }
@@ -655,10 +652,8 @@ async function validateCodexOpenAIExtension(manifest) {
       codexError(`${root}.review.${key}`, "must not be included.");
     }
   }
-  // Review cases are optional, but a set that is present must be complete.
-  const testCases = review?.test_cases;
-  for (const [kind, count] of testCases === undefined ? [] : [["positive", 5], ["negative", 3]]) {
-    const cases = testCases?.[kind];
+  for (const [kind, count] of [["positive", 5], ["negative", 3]]) {
+    const cases = review?.test_cases?.[kind];
     const field = `${root}.review.test_cases.${kind}`;
     if (!Array.isArray(cases) || cases.length !== count) {
       codexError(field, `must have exactly ${count} entries.`);

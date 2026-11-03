@@ -21,7 +21,7 @@
   "interface": {
     "displayName": "Supabuild",
     "shortDescription": "Team knowledge and delivery",
-    "longDescription": "Supabuild is a team workspace where agents turn conversation into delivered software. This plugin connects your agent to Supabuild's remote MCP server. Ask the Discovery agent, which researches, drafts and proposes team knowledge and starts delivery threads. Read your team's knowledge: decisions, scopes, methods and goals, each marked accepted, proposed or historical. Follow delivery threads as coding agents carry work from clarified requirements to committed changes, a preview and a verified deployment. You sign in with OAuth in your client, and each connection is scoped to one project you choose. Accepting proposed knowledge stays a person's decision in the web app.",
+    "longDescription": "Supabuild is a team workspace where agents turn conversation into delivered software. This plugin connects your agent to Supabuild's remote MCP server. Ask the Discovery agent, which researches, drafts and proposes team knowledge and starts delivery threads. Read your team's knowledge, in the document types your team uses, each marked accepted, proposed or historical. Follow delivery threads as coding agents carry work from clarified requirements to committed changes, a preview and a verified deployment. You sign in with OAuth in your client, and each connection is scoped to one project you choose. Accepting proposed knowledge stays a person's decision in the web app.",
     "developerName": "Hamster",
     "category": "Developer Tools",
     "capabilities": ["Read", "Write", "Interactive"],
@@ -29,6 +29,11 @@
     "supportURL": "https://github.com/gethamster/plugin/issues",
     "privacyPolicyURL": "https://tryhamster.com/privacy-policy",
     "termsOfServiceURL": "https://tryhamster.com/terms-of-service",
+    "defaultPrompt": [
+      "What decisions has my team accepted, and which proposals are still waiting for a person?",
+      "Ask the Discovery agent what we should build next in this project.",
+      "Which delivery threads need my attention, and what is each one waiting for?"
+    ],
     "brandColor": "#141414",
     "brandColorDark": "#fafaf9",
     "composerIcon": "./assets/icon.png",
@@ -39,7 +44,24 @@
     "com.openai": {
       "onboardingSkill": "./skills/sign-in/SKILL.md",
       "review": {
+        "test_cases": {
+          "positive": [
+            {"description": "List the team's accepted decisions", "prompt": "What decisions has my team accepted in Supabuild?", "tools_triggered": "read", "expected_behavior": "May call read with path / to see the team's own knowledge types, then calls read with path knowledge?standing=accepted, adding ?type= with the team's type for decisions when it has one. Lists each returned document with its title or path and standing. If the list is empty with revision null, says nothing has been published yet. Invents no decisions."},
+            {"description": "Search team knowledge and read a document", "prompt": "Search our Supabuild knowledge for authentication and tell me what guidance applies.", "tools_triggered": "search, read", "expected_behavior": "Calls search with path knowledge?q= about authentication, then may read a returned document with path knowledge/<documentId> to get its full text and standing. Summarizes only what the returned documents say and names each one's standing, without presenting a proposed or historical document as current guidance. If nothing relevant is returned, says so."},
+            {"description": "Ask the Discovery agent and follow the ask to its answer", "prompt": "Ask the Supabuild Discovery agent which open questions are blocking our current work.", "tools_triggered": "create, read", "expected_behavior": "Calls create with path discovery?key=<a new key> and the question as body. If the result is working, calls read with path discovery/<invocationId> for the returned invocationId, waiting pollAfterMs between calls, until it is completed, failed or input_required. Reports the answer from result; if input_required, shows the agent's questions to the user instead of answering them itself."},
+            {"description": "Check what delivery threads are waiting for", "prompt": "Which Supabuild delivery threads are in my project, and what is each one waiting for?", "tools_triggered": "read", "expected_behavior": "Calls read with path threads, then read with path threads/<threadId> for the returned threads, and reports each thread's state and attention.waitingFor, saying when a person must act and giving that thread's studioUrl. If there are no threads, says so."},
+            {"description": "Steer a delivery thread (additive write)", "prompt": "Tell my most recent Supabuild delivery thread to add a test for the empty cart case.", "tools_triggered": "read, message", "expected_behavior": "Finds the thread with read on path threads (and may read it with path threads/<threadId>), then calls message once with path threads/<threadId>?key=<a new key> and a body asking for the empty cart test. Confirms the guidance was sent. Doesn't answer the thread's questions or retry a delivery."}
+          ],
+          "negative": [
+            {"description": "Accepting a proposal is a person's decision. Accepting or rejecting proposed knowledge happens only in the web app, so the plugin must not try. Expected: accepts nothing, explains that a person accepts proposals in the web app, and may read the proposal to give its studioUrl.", "prompt": "Accept the proposed checkout decision in Supabuild for me.", "expected_behavior": "Doesn't accept or reject anything and doesn't ask the Discovery agent to. Explains that accepting a proposal is a person's decision in the web app. May call search with path knowledge?q= about checkout, or read with path knowledge/<documentId>, to find the proposal and give the user its studioUrl. Makes no write."},
+            {"description": "A project outside this connection's grant. Each connection reaches only the project chosen at sign-in, so the plugin must not return another project's data. Expected: returns nothing from that project, explains the one-project scope, and may point the user to signing in again with the other project.", "prompt": "Show me the delivery threads in the Acme Payments project. This connection wasn't granted that project.", "expected_behavior": "Returns no data from that project. Explains that this connection reaches only the project chosen when signing in, and that connecting to another project means signing in again and choosing it. May at most list this connection's own threads with read on path threads. Makes no write."},
+            {"description": "Payments are out of scope. Supabuild's tools don't process payments, billing or invoices, so the plugin shouldn't act. Expected: declines, makes no write, and doesn't ask for card details.", "prompt": "Pay this month's invoice with my card ending in 4242.", "expected_behavior": "Declines: Supabuild's tools don't process payments, billing or invoices. Makes no payment and no write, calls no create, update or message, and doesn't ask for card details."}
+          ]
+        },
         "demo_recording_url": "https://www.youtube.com/watch?v=-ndf7R1tKHE"
+      },
+      "publication": {
+        "release_notes": "4.0.0 connects ChatGPT and Codex to Supabuild's remote MCP server. Six tools: create, read, update, delete, search and message, each acting on a path such as discovery, knowledge or threads. search finds published knowledge by words (knowledge?q=) or gathers the guidance a feature request must follow (knowledge/context), read with path / returns the full map of what exists and the team's own knowledge types, and delete cancels a Discovery ask. With them you ask your team's Discovery agent and follow each ask to its answer, search and read the team's published knowledge in whatever types the team uses, and follow, steer, answer and retry delivery threads. create, update and message are marked idempotent, so a retry with the same path, key and body is safe. Codex also gets four skills: sign-in, discovery-agent, team-knowledge and delivery-threads. Each connection is scoped to one project you choose when you sign in with OAuth, and accepting proposed knowledge stays a person's decision in the web app."
       }
     }
   }
