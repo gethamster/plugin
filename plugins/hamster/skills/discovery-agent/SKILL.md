@@ -17,7 +17,7 @@ This skill uses these paths:
 | `message` | `discovery/<invocationId>?key=<key>` | your follow-up | Follows up a finished ask in the same conversation |
 | `read` | `discovery/<invocationId>` | none | Reads an ask's state |
 | `update` | `discovery/<invocationId>/requests/<requestId>` | your answer, or none with `?option=<optionId>` | Answers one of the agent's questions |
-| `delete` | `discovery/<invocationId>` | none | Cancels an ask (a finished ask comes back unchanged; stopping a running one isn't supported yet) |
+| `delete` | `discovery/<invocationId>` | none | The cancel call for an ask (a finished ask comes back unchanged; an ask still working or waiting for input returns `conflict`) |
 
 Your client may ask the user to approve each `create`, `update`, `delete` and `message` call before it runs.
 
@@ -70,7 +70,7 @@ The same ask then continues. Handle the result the same way as the first call.
 
 ## Cancel an ask
 
-`delete` with path `discovery/<invocationId>` cancels an ask. It takes no body. A finished ask comes back unchanged. Cancelling a turn that is still running isn't supported yet and returns `conflict`. Only cancel when the user asks.
+`delete` with path `discovery/<invocationId>` is the cancel call for an ask. It takes no body. A finished ask comes back unchanged; an ask still working or waiting for input returns `conflict`, because stopping a turn isn't supported yet. Only cancel when the user asks.
 
 ## Retry safely
 

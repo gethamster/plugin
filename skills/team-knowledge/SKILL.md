@@ -28,7 +28,7 @@ If the tools are missing, or a call fails with `error.code` `unauthorized`, use 
 | `read` | `knowledge/<documentId>` or `knowledge/<document path>` | none | Read one document: its Markdown content, standing, rationale, links and backlinks. For example `knowledge/notes/checkout.md` |
 | `read` | `knowledge/<documentId>/links?depth=…&rel=…&direction=…&limit=…` | none | Follow typed links such as `constrained_by`, `supersedes` and `references`. `depth` is 1 to 4, `direction` is `in`, `out` or `both`, `limit` goes up to 100 |
 
-Every query part of a path is optional except `q` on `search`. Separate several `type`, `seed` or `rel` values with commas; `standing` takes one. Types match regardless of case. A word in `q` that holds `?`, `#` or `%` percent-encodes it (`%3F`, `%23`, `%25`).
+Every query part of a path is optional except `q` on `search`. Separate several `type`, `seed` or `rel` values with commas; `standing` takes one. Types match regardless of case. A word in `q` that holds `?`, `#`, `&` or `%` percent-encodes it (`%3F`, `%23`, `%26`, `%25`); `+` is a plus sign, not a space.
 
 Every result names the exact revision it read. Omit `revision` to use the current one, and pass a revision only to read an earlier state on purpose.
 
