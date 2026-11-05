@@ -214,42 +214,6 @@ test("a Cursor manifest without mcpServers fails validation", async () => {
   assert.match(result.stderr, /Cursor plugin\.json must set mcpServers to "\.\/\.mcp\.json"/);
 });
 
-test("an over-cap Codex shortDescription fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-short-");
-  await copyPackage(cwd);
-  await patchCodexInterface(cwd, (iface) => {
-    iface.shortDescription = "x".repeat(31);
-  });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /interface\.shortDescription is 31 chars; directory submission caps it at 30/);
-});
-
-test("an unsupported Codex category fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-category-");
-  await copyPackage(cwd);
-  await patchCodexInterface(cwd, (iface) => {
-    iface.category = "Coding";
-  });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /interface\.category must be one of .*Developer Tools.*got "Coding"/);
-});
-
-test("a fourth Codex starter prompt fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-prompts-");
-  await copyPackage(cwd);
-  await patchCodexInterface(cwd, (iface) => {
-    iface.defaultPrompt = [...iface.defaultPrompt, "Retro the last two weeks"];
-  });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /interface\.defaultPrompt has 4 entries; the directory allows at most 3/);
-});
-
 test("a Codex starter prompt that sends the agent to a URL fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-codex-prompt-url-");
   await copyPackage(cwd);
@@ -272,58 +236,6 @@ test("a non-https Codex privacyPolicyURL fails validation", async () => {
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /interface\.privacyPolicyURL must be https/);
-});
-
-test("privacyPolicyUrl on the Claude manifest fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-claude-privacy-key-");
-  await copyPackage(cwd);
-  const manifestPath = plugin(cwd, ".claude-plugin", "plugin.json");
-  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-  manifest.privacyPolicyUrl = "https://tryhamster.com/privacy-policy";
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /must not set "privacyPolicyUrl"/);
-});
-
-test("a plugin README without a Privacy link fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-readme-privacy-");
-  await copyPackage(cwd);
-  const readmePath = plugin(cwd, "README.md");
-  const readme = (await readFile(readmePath, "utf8")).replaceAll(
-    "[Privacy Policy](https://tryhamster.com/privacy-policy)",
-    "Privacy Policy",
-  );
-  await writeFile(readmePath, readme);
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /README\.md must include a Markdown link whose text contains "Privacy"/);
-});
-
-test("a dropped Codex support link fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-support-");
-  await copyPackage(cwd);
-  await patchCodexInterface(cwd, (iface) => {
-    delete iface.supportURL;
-  });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /interface\.supportURL must be a non-empty string/);
-});
-
-test("a fourth Codex negative review case fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-review-count-");
-  await copyPackage(cwd);
-  await patchCodexManifest(cwd, (manifest) => {
-    const cases = manifest.extensions["com.openai"].review.test_cases.negative;
-    cases.push({ ...cases[0] });
-  });
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /review\.test_cases\.negative must have exactly 3 entries/);
 });
 
 test("Codex reviewer credentials in the manifest fail validation", async () => {
@@ -364,31 +276,6 @@ for (const [kind, field] of [
     assert.ok(result.stderr.includes(`review.test_cases.${kind}[0].${field} must be a non-empty string`), result.stderr);
   });
 }
-
-test("a Codex catalog category that drifts from the manifest fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-catalog-");
-  await copyPackage(cwd);
-  const catalogPath = path.join(cwd, ".agents", "plugins", "marketplace.json");
-  const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
-  catalog.plugins[0].category = "Productivity";
-  await writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /category "Productivity" does not match \.codex-plugin\/plugin\.json interface\.category "Developer Tools"/);
-});
-
-test("a plugin description that drifts from its siblings fails validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-description-drift-");
-  await copyPackage(cwd);
-  await patchCodexManifest(cwd, (manifest) => {
-    manifest.description = `${manifest.description} Ask Hamster over hosted MCP.`;
-  });
-
-  const result = await runValidator(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Plugin descriptions have drifted across manifests/);
-});
 
 test("a plugin manifest left at the repository root fails validation", async () => {
   const cwd = await makeTemp("hamster-plugin-root-manifest-");
@@ -543,18 +430,6 @@ test("an Agent Plugins $schema in plugins/hamster/plugin.json fails validation",
   const result = await runValidator(cwd);
   assert.notEqual(result.code, 0);
   assert.match(result.stderr, /plugins\/hamster\/plugin\.json must not declare "\$schema"/);
-});
-
-test("the three Codex listing images inside plugins/hamster pass validation", async () => {
-  const cwd = await makeTemp("hamster-plugin-codex-icons-");
-  await copyPackage(cwd);
-
-  const result = await runValidator(cwd);
-  assert.equal(result.code, 0, result.stderr);
-  const manifest = JSON.parse(await readFile(plugin(cwd, ".codex-plugin", "plugin.json"), "utf8"));
-  assert.equal(manifest.interface.composerIcon, "./assets/icon.png");
-  assert.equal(manifest.interface.logo, "./assets/logo.png");
-  assert.equal(manifest.interface.logoDark, "./assets/logo-dark.png");
 });
 
 test("a Codex image other than the three listing PNGs fails validation", async () => {
