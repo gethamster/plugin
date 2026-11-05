@@ -98,25 +98,6 @@ async function patchCodexInterface(cwd, patch) {
   await patchCodexManifest(cwd, (manifest) => patch(manifest.interface));
 }
 
-// The bundle builder refuses sources that match no commit, so fixtures that
-// build a bundle need a checkout rather than a bare directory.
-async function commitPackage(cwd) {
-  const git = (...args) => run("git", args, { cwd });
-  assert.equal((await git("init", "--quiet")).code, 0);
-  assert.equal((await git("add", "--all")).code, 0);
-  const commit = await git(
-    "-c",
-    "user.name=Fixture",
-    "-c",
-    "user.email=fixture@example.com",
-    "commit",
-    "--quiet",
-    "--message",
-    "fixture"
-  );
-  assert.equal(commit.code, 0, commit.stderr);
-}
-
 async function pathExists(target) {
   try {
     await stat(target);
@@ -515,7 +496,6 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
   await patchCodexManifest(cwd, (manifest) => {
     manifest.apps = "./.app.json";
   });
-  await commitPackage(cwd);
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.equal(result.code, 0, result.stderr);
@@ -567,7 +547,6 @@ test("the Codex bundle carries the manifest, the MCP server, skills, and assets"
 test("archive bytes follow the checkout, not the machine building it", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-repeat-");
   await copyPackage(cwd);
-  await commitPackage(cwd);
 
   // A reviewer rebuilding the branch to compare hashes runs under their own
   // umask and timezone, and zip records both unless the build pins them.
@@ -587,24 +566,6 @@ test("archive bytes follow the checkout, not the machine building it", async () 
   assert.equal(digests[0], digests[1]);
 });
 
-test("an uncommitted bundle source stops the build", async () => {
-  const cwd = await makeTemp("hamster-plugin-bundle-dirty-");
-  await copyPackage(cwd);
-  await commitPackage(cwd);
-  const skillPath = plugin(cwd, "skills", "ship", "SKILL.md");
-  await writeFile(skillPath, `${await readFile(skillPath, "utf8")}\nUncommitted line.\n`);
-  // Regenerate the root copy so the edit passes validation and only the dirty
-  // checkout stops the build.
-  const sync = await run(process.execPath, ["scripts/sync-adapters.mjs"], { cwd });
-  assert.equal(sync.code, 0, sync.stderr);
-
-  const { result, zipPath } = await buildCodexBundle(cwd);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /Commit or stash your changes first/);
-  assert.match(result.stderr, /plugins\/hamster\/skills\/ship\/SKILL\.md/);
-  assert.equal(await pathExists(zipPath), false);
-});
-
 test("a setup skill whose install section is renamed stops the Codex bundle build", async () => {
   const cwd = await makeTemp("hamster-plugin-bundle-install-section-");
   await copyPackage(cwd);
@@ -613,7 +574,6 @@ test("a setup skill whose install section is renamed stops the Codex bundle buil
   const skillPath = plugin(cwd, "skills", "setup", "SKILL.md");
   const skill = await readFile(skillPath, "utf8");
   await writeFile(skillPath, skill.replace("\n## Install the CLI\n", "\n## Get the CLI\n"));
-  await commitPackage(cwd);
 
   const { result, zipPath } = await buildCodexBundle(cwd);
   assert.notEqual(result.code, 0);

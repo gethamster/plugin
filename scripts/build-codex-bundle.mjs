@@ -103,37 +103,6 @@ async function pathExists(targetPath) {
   }
 }
 
-// Whole-tree, the way np, npm version, and release-it gate a release: a build
-// reads the manifest, the skills, the assets, the license, the version, and the
-// validator, and a per-path allowlist of that set is one more thing to keep in
-// step with what the build actually touches. Only the build's own output is
-// excused, so the guard does not depend on .gitignore naming whichever --out ran.
-function requireCleanCheckout(outDir) {
-  const pathspec = ["."];
-  const relativeOut = path.relative(repoRoot, outDir);
-  if (relativeOut && !relativeOut.startsWith("..") && !path.isAbsolute(relativeOut)) {
-    pathspec.push(`:(exclude)${relativeOut}`, `:(exclude,glob)${relativeOut}/**`);
-  }
-
-  let status;
-  try {
-    status = execFileSync("git", ["status", "--porcelain", "--", ...pathspec], {
-      cwd: repoRoot,
-      encoding: "utf8",
-    });
-  } catch (error) {
-    throw new Error(
-      `The bundle is built from a git checkout so the artifact maps to a commit; git status failed: ${error.message}`
-    );
-  }
-
-  if (status.trim()) {
-    throw new Error(
-      `Commit or stash your changes first; otherwise the artifact matches no commit:\n${status.trimEnd()}`
-    );
-  }
-}
-
 async function listSkillNames() {
   const skillsDir = path.join(pluginDir, "skills");
   const entries = await fs.readdir(skillsDir, { withFileTypes: true });
@@ -352,7 +321,6 @@ async function main() {
   });
 
   const outDir = path.resolve(repoRoot, options.out);
-  requireCleanCheckout(outDir);
 
   const { version } = await readJsonFile(path.join(pluginDir, "plugin.json"));
   if (!version) {
