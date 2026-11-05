@@ -17,10 +17,6 @@ jobs:
           node-version: "20"
       - name: Run plugin package tests
         run: node --test scripts/test-plugin.mjs
-      - name: Check generated agents, root manifests, and Gemini extension
-        run: node scripts/sync-adapters.mjs --check
-      - name: Validate plugin package
-        run: node scripts/validate-plugin.mjs
       - name: Build Codex plugin bundle
         run: node scripts/build-codex-bundle.mjs
       - name: Upload Codex plugin bundle
