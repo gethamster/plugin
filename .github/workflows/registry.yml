@@ -7,6 +7,7 @@ name: MCP Registry
 # merge a bump only once the hosted server reports that version.
 on:
   push:
+    branches: [main]
   pull_request:
   # Rerun a publish by hand.
   workflow_dispatch:
